@@ -1,35 +1,13 @@
 "use client";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
+import { OrbitControls, Environment } from "@react-three/drei";
 import * as THREE from "three";
 import { useRef } from "react";
 import { useDebugUI } from "./hooks/useDebugUI";
 import { Leva } from "leva";
-import { GLBModel } from "./components/GLBModel";
 import { Lights } from "./components/Lights";
-
-
-function ModelControls() {
-  const { model } = useDebugUI();
-  const {
-    position,
-    scale,
-    rotation,
-    autoRotate,
-    rotationSpeed,
-  } = model;
-
-  return (
-    <GLBModel 
-      url="/cozy_room.glb"
-      position={position as [number, number, number]}
-      scale={scale as [number, number, number]}
-      rotation={rotation as [number, number, number]}
-      autoRotate={autoRotate}
-      rotationSpeed={rotationSpeed}
-    />
-  );
-}
+import { Spaceship } from "./components/Spaceship";
+import { Asteroids } from "./components/Asteroids";
 
 export default function Home() {
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -55,8 +33,10 @@ export default function Home() {
           cameraRef.current = camera as THREE.PerspectiveCamera;
         }}
       >
+        <Environment background files="/hdr_compressed.hdr" />
         <Lights />
-        <ModelControls />
+        <Spaceship/>
+        <Asteroids/>
         <OrbitControls 
           enablePan={true}
           enableZoom={true}

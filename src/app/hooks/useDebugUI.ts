@@ -20,8 +20,17 @@ export const useDebugUI = () => {
     rotationSpeed: { value: 0.005, min: 0, max: 0.02, step: 0.001 },
   });
 
+  const asteroidControls = useControls("Asteroids", {
+    spinVelocityMultiplier: { value: 10, min: 0, max: 30, step: 0.1 },
+    moveVelocityMultiplier: { value: 10, min: 0, max: 30, step: 0.1 },
+    bigPercent: { value: 5, min: 0, max: 100, step: 1 },
+    mediumPercent: { value: 100, min: 0, max: 100, step: 1 },
+    smallPercent: { value: 100, min: 0, max: 100, step: 1 },
+  });
+
   return {
     lighting: lightingControls,
     model: modelControls,
+    asteroids: asteroidControls,
   };
 };
