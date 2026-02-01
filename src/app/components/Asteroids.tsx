@@ -161,6 +161,10 @@ export function Asteroids() {
           </group>
         );
       })}
+            <mesh 
+              geometry={nodes.asteroid_big002?.geometry} 
+              material={nodes.asteroid_big002?.material}
+            />
     </group>
   );
 }

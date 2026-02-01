@@ -1,6 +1,6 @@
 "use client";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Environment } from "@react-three/drei";
+import { Environment } from "@react-three/drei";
 import * as THREE from "three";
 import { useRef } from "react";
 import { useDebugUI } from "./hooks/useDebugUI";
@@ -37,12 +37,6 @@ export default function Home() {
         <Lights />
         <Spaceship/>
         <Asteroids/>
-        <OrbitControls 
-          enablePan={true}
-          enableZoom={true}
-          enableRotate={true}
-          makeDefault
-        />
       </Canvas>
     </div>
   );
