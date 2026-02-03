@@ -39,7 +39,7 @@ export function updateShipAxis(
   steeringVelocity *= Math.pow(0.93, deltaTime);
  
   if(controls[' ']) {
-    shipSpeed += 0.002 * deltaTime
+    shipSpeed += 0.0005 * deltaTime
   } else {
     shipSpeed *= Math.pow(0.95, deltaTime)
   }
@@ -92,7 +92,8 @@ export function updateShipAxis(
   const turboSpeed = easeOutQuad(turbo) * 0.02
 
   if ("isPerspectiveCamera" in camera && camera.isPerspectiveCamera) {
-    camera.fov = 45 + turboSpeed * 900
+    // console.log(shipSpeed/5)
+    camera.fov = 45 + (turboSpeed + Math.min(shipSpeed/5, 0.02)) * 900
     camera.updateProjectionMatrix()
   }
 

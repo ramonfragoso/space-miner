@@ -1,6 +1,6 @@
 "use client";
 import { useRef, useMemo, useEffect } from "react";
-import { useGLTF } from "@react-three/drei";
+import { Sparkles, useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { useDebugUI } from "../hooks/useDebugUI";
@@ -14,13 +14,13 @@ interface AsteroidData {
   baseMovementSpeed: number;
   asteroidTypeIndex: number;
   scale: number;
-  instanceIndex: number; 
+  instanceIndex: number;
 }
 
 export function Asteroids() {
   const { nodes } = useGLTF('/asteroids.glb');
   const { asteroids: asteroidControls } = useDebugUI();
-  
+
   const instancedMeshRefs = useRef<Map<string, THREE.InstancedMesh>>(new Map());
 
   const asteroidNamesByType = useMemo(() => ({
@@ -126,11 +126,11 @@ export function Asteroids() {
 
   useEffect(() => {
     const matrix = new THREE.Matrix4();
-    
+
     instancedMeshRefs.current.forEach((instancedMesh, asteroidName) => {
       const asteroidTypeIndex = allAsteroidNames.indexOf(asteroidName);
       const instances = asteroidsData.filter(a => a.asteroidTypeIndex === asteroidTypeIndex);
-      
+
       instances.forEach((asteroidData) => {
         matrix.compose(
           asteroidData.position,
@@ -139,7 +139,7 @@ export function Asteroids() {
         );
         instancedMesh.setMatrixAt(asteroidData.instanceIndex, matrix);
       });
-      
+
       instancedMesh.instanceMatrix.needsUpdate = true;
     });
   }, [asteroidsData, allAsteroidNames]);
@@ -172,7 +172,7 @@ export function Asteroids() {
 
       const asteroidName = allAsteroidNames[asteroidData.asteroidTypeIndex];
       const instancedMesh = instancedMeshRefs.current.get(asteroidName);
-      
+
       if (instancedMesh) {
         quaternion.setFromEuler(asteroidData.rotation);
         matrix.compose(
@@ -196,16 +196,19 @@ export function Asteroids() {
         if (count === 0) return null;
 
         return (
-          <instancedMesh
-            key={asteroidName}
-            ref={(ref) => {
-              if (ref) {
-                instancedMeshRefs.current.set(asteroidName, ref);
-              }
-            }}
-            args={[node.geometry, node.material, count]}
-            frustumCulled={false}
-          />
+          <>
+
+            <instancedMesh
+              key={asteroidName}
+              ref={(ref) => {
+                if (ref) {
+                  instancedMeshRefs.current.set(asteroidName, ref);
+                }
+              }}
+              args={[node.geometry, node.material, count]}
+              frustumCulled={false}
+            />
+          </>
         );
       })}
     </group>

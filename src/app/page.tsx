@@ -1,6 +1,7 @@
 "use client";
 import { Canvas } from "@react-three/fiber";
-import { Environment, GizmoHelper, GizmoViewport, Stars } from "@react-three/drei";
+import { Environment, GizmoHelper, GizmoViewport } from "@react-three/drei";
+import { Stars } from "./components/Stars";
 import * as THREE from "three";
 import { useRef } from "react";
 import { useDebugUI } from "./hooks/useDebugUI";
@@ -36,7 +37,8 @@ export default function Home() {
         <Environment background files="/hdr_compressed.hdr" />
         <Lights />
         <fog attach="fog" args={["#000001", 10, 100]} />
-        <Stars radius={1000} depth={1000} count={5000} factor={20} saturation={0} fade speed={1} />
+        <Stars radius={1000} depth={2000} count={10000} factor={32} saturation={1} fade speed={1} />
+        <Stars radius={10} depth={2000} count={30000} factor={1} saturation={1} fade speed={1} />
         <Spaceship/>
         <Asteroids/>
         <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
