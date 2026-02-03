@@ -2,7 +2,7 @@ import { useControls } from "leva";
 
 export const useDebugUI = () => {
   const lightingControls = useControls("Lighting", {
-    ambientIntensity: { value: 5.3, min: 0, max: 20, step: 0.1 },
+    ambientIntensity: { value: 7, min: 0, max: 20, step: 0.1 },
     directionalIntensity: { value: 0.8, min: 0, max: 10, step: 0.1 },
     directionalPosition: { value: [0, 10, 8], step: 0.5 },
     directionalColor: "#ffffff",
@@ -23,9 +23,9 @@ export const useDebugUI = () => {
   const asteroidControls = useControls("Asteroids", {
     spinVelocityMultiplier: { value: 10, min: 0, max: 30, step: 0.1 },
     moveVelocityMultiplier: { value: 10, min: 0, max: 30, step: 0.1 },
-    bigPercent: { value: 5, min: 0, max: 100, step: 1 },
-    mediumPercent: { value: 100, min: 0, max: 100, step: 1 },
-    smallPercent: { value: 100, min: 0, max: 100, step: 1 },
+    bigCount: { value: 120, min: 0, max: 5000, step: 1 },
+    mediumCount: { value: 2000, min: 0, max: 5000, step: 1 },
+    smallCount: { value: 3000, min: 0, max: 10000, step: 1 },
   });
 
   return {

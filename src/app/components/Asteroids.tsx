@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useMemo } from "react";
+import { useRef, useMemo, useEffect } from "react";
 import { useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
@@ -7,20 +7,21 @@ import { useDebugUI } from "../hooks/useDebugUI";
 
 interface AsteroidData {
   position: THREE.Vector3;
+  rotation: THREE.Euler;
   rotationVelocity: THREE.Vector3;
   movementDirection: THREE.Vector3;
   baseRotationSpeed: number;
   baseMovementSpeed: number;
   asteroidTypeIndex: number;
   scale: number;
+  instanceIndex: number; 
 }
-
-const ASTEROID_COUNT = 1000;
 
 export function Asteroids() {
   const { nodes } = useGLTF('/asteroids.glb');
-  const groupRef = useRef<THREE.Group>(null);
   const { asteroids: asteroidControls } = useDebugUI();
+  
+  const instancedMeshRefs = useRef<Map<string, THREE.InstancedMesh>>(new Map());
 
   const asteroidNamesByType = useMemo(() => ({
     big: [
@@ -46,20 +47,28 @@ export function Asteroids() {
     ...asteroidNamesByType.small,
   ], [asteroidNamesByType]);
 
-  const { bigPercent, mediumPercent, smallPercent } = asteroidControls;
+  const { bigCount, mediumCount, smallCount } = asteroidControls;
 
-  const asteroidsData = useMemo<AsteroidData[]>(() => {
-    const totalPercent = bigPercent + mediumPercent + smallPercent;
-    
-    // Normalize percentages if they don't add up to 100
-    const normalizedBig = totalPercent > 0 ? bigPercent / totalPercent : 0.1;
-    const normalizedMedium = totalPercent > 0 ? mediumPercent / totalPercent : 0.4;
+  const { asteroidsData, instanceCounts } = useMemo(() => {
+    const instanceIndices = new Map<number, number>();
+    allAsteroidNames.forEach((_, idx) => instanceIndices.set(idx, 0));
 
-    return Array.from({ length: ASTEROID_COUNT }, () => {
+    const data: AsteroidData[] = [];
+
+    const createAsteroid = (
+      typeNames: string[],
+      scale: number
+    ): AsteroidData => {
       const position = new THREE.Vector3(
         (Math.random() - 0.5) * 500,
         (Math.random() - 0.5) * 500,
         (Math.random() - 0.5) * 500
+      );
+
+      const rotation = new THREE.Euler(
+        Math.random() * Math.PI * 2,
+        Math.random() * Math.PI * 2,
+        Math.random() * Math.PI * 2
       );
 
       const rotationVelocity = new THREE.Vector3(
@@ -77,51 +86,73 @@ export function Asteroids() {
       const baseRotationSpeed = Math.random() * 0.01 + 0.005;
       const baseMovementSpeed = Math.random() * 0.5 + 0.1;
 
-      // Determine asteroid type based on percentages
-      const rand = Math.random();
-      let asteroidName: string;
-      let scale: number;
-
-      if (rand < normalizedBig) {
-        const typeNames = asteroidNamesByType.big;
-        asteroidName = typeNames[Math.floor(Math.random() * typeNames.length)];
-        scale = 10;
-      } else if (rand < normalizedBig + normalizedMedium) {
-        const typeNames = asteroidNamesByType.medium;
-        asteroidName = typeNames[Math.floor(Math.random() * typeNames.length)];
-        scale = 2;
-      } else {
-        const typeNames = asteroidNamesByType.small;
-        asteroidName = typeNames[Math.floor(Math.random() * typeNames.length)];
-        scale = 1;
-      }
-
-      // Find the index in the allAsteroidNames array
+      const asteroidName = typeNames[Math.floor(Math.random() * typeNames.length)];
       const asteroidTypeIndex = allAsteroidNames.indexOf(asteroidName);
+      const instanceIndex = instanceIndices.get(asteroidTypeIndex) || 0;
+      instanceIndices.set(asteroidTypeIndex, instanceIndex + 1);
 
       return {
         position,
+        rotation,
         rotationVelocity,
         movementDirection,
         baseRotationSpeed,
         baseMovementSpeed,
         asteroidTypeIndex,
         scale,
+        instanceIndex,
       };
+    };
+
+    for (let i = 0; i < bigCount; i++) {
+      data.push(createAsteroid(asteroidNamesByType.big, 10));
+    }
+
+    for (let i = 0; i < mediumCount; i++) {
+      data.push(createAsteroid(asteroidNamesByType.medium, 2));
+    }
+
+    for (let i = 0; i < smallCount; i++) {
+      data.push(createAsteroid(asteroidNamesByType.small, 1));
+    }
+
+    const counts = new Map<number, number>();
+    allAsteroidNames.forEach((_, idx) => {
+      counts.set(idx, instanceIndices.get(idx) || 0);
     });
-  }, [asteroidNamesByType, allAsteroidNames, bigPercent, mediumPercent, smallPercent]);
+
+    return { asteroidsData: data, instanceCounts: counts };
+  }, [asteroidNamesByType, allAsteroidNames, bigCount, mediumCount, smallCount]);
+
+  useEffect(() => {
+    const matrix = new THREE.Matrix4();
+    
+    instancedMeshRefs.current.forEach((instancedMesh, asteroidName) => {
+      const asteroidTypeIndex = allAsteroidNames.indexOf(asteroidName);
+      const instances = asteroidsData.filter(a => a.asteroidTypeIndex === asteroidTypeIndex);
+      
+      instances.forEach((asteroidData) => {
+        matrix.compose(
+          asteroidData.position,
+          new THREE.Quaternion().setFromEuler(asteroidData.rotation),
+          new THREE.Vector3(asteroidData.scale, asteroidData.scale, asteroidData.scale)
+        );
+        instancedMesh.setMatrixAt(asteroidData.instanceIndex, matrix);
+      });
+      
+      instancedMesh.instanceMatrix.needsUpdate = true;
+    });
+  }, [asteroidsData, allAsteroidNames]);
 
   useFrame((state, delta) => {
-    if (!groupRef.current) return;
+    const matrix = new THREE.Matrix4();
+    const quaternion = new THREE.Quaternion();
 
-    asteroidsData.forEach((asteroidData, index) => {
-      const asteroid = groupRef.current?.children[index] as THREE.Group;
-      if (!asteroid) return;
-
+    asteroidsData.forEach((asteroidData) => {
       const rotationSpeed = asteroidData.baseRotationSpeed * asteroidControls.spinVelocityMultiplier;
-      asteroid.rotation.x += asteroidData.rotationVelocity.x * rotationSpeed;
-      asteroid.rotation.y += asteroidData.rotationVelocity.y * rotationSpeed;
-      asteroid.rotation.z += asteroidData.rotationVelocity.z * rotationSpeed;
+      asteroidData.rotation.x += asteroidData.rotationVelocity.x * rotationSpeed;
+      asteroidData.rotation.y += asteroidData.rotationVelocity.y * rotationSpeed;
+      asteroidData.rotation.z += asteroidData.rotationVelocity.z * rotationSpeed;
 
       const movementSpeed = asteroidData.baseMovementSpeed * asteroidControls.moveVelocityMultiplier;
       asteroidData.position.add(
@@ -139,32 +170,44 @@ export function Asteroids() {
         asteroidData.position.z = -Math.sign(asteroidData.position.z) * halfSize;
       }
 
-      asteroid.position.copy(asteroidData.position);
+      const asteroidName = allAsteroidNames[asteroidData.asteroidTypeIndex];
+      const instancedMesh = instancedMeshRefs.current.get(asteroidName);
+      
+      if (instancedMesh) {
+        quaternion.setFromEuler(asteroidData.rotation);
+        matrix.compose(
+          asteroidData.position,
+          quaternion,
+          new THREE.Vector3(asteroidData.scale, asteroidData.scale, asteroidData.scale)
+        );
+        instancedMesh.setMatrixAt(asteroidData.instanceIndex, matrix);
+        instancedMesh.instanceMatrix.needsUpdate = true;
+      }
     });
   });
 
   return (
-    <group 
-      ref={groupRef}
-    >
-      {asteroidsData.map((asteroidData, index) => {
-        const asteroidName = allAsteroidNames[asteroidData.asteroidTypeIndex];
+    <group>
+      {allAsteroidNames.map((asteroidName) => {
         const node = nodes?.[asteroidName as keyof typeof nodes] as THREE.Mesh | undefined;
         if (!node?.geometry || !node?.material) return null;
 
+        const count = instanceCounts.get(allAsteroidNames.indexOf(asteroidName)) || 0;
+        if (count === 0) return null;
+
         return (
-          <group key={index} position={asteroidData.position} scale={asteroidData.scale}>
-            <mesh 
-              geometry={node.geometry} 
-              material={node.material}
-            />
-          </group>
+          <instancedMesh
+            key={asteroidName}
+            ref={(ref) => {
+              if (ref) {
+                instancedMeshRefs.current.set(asteroidName, ref);
+              }
+            }}
+            args={[node.geometry, node.material, count]}
+            frustumCulled={false}
+          />
         );
       })}
-            <mesh 
-              geometry={nodes.asteroid_big002?.geometry} 
-              material={nodes.asteroid_big002?.material}
-            />
     </group>
   );
 }

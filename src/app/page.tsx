@@ -1,6 +1,6 @@
 "use client";
 import { Canvas } from "@react-three/fiber";
-import { Environment } from "@react-three/drei";
+import { Environment, GizmoHelper, GizmoViewport, Stars } from "@react-three/drei";
 import * as THREE from "three";
 import { useRef } from "react";
 import { useDebugUI } from "./hooks/useDebugUI";
@@ -22,7 +22,7 @@ export default function Home() {
       <Canvas
         shadows
         dpr={[0.5, 0.8]}
-        camera={{ position: [5, 5, 5], fov: 45, near: 0.1, far: 500 }}
+        camera={{ position: [5, 5, 5], fov: 45, near: 0.1, far: 5000 }}
         gl={{
           antialias: true,
           toneMapping: THREE.ACESFilmicToneMapping,
@@ -35,8 +35,13 @@ export default function Home() {
       >
         <Environment background files="/hdr_compressed.hdr" />
         <Lights />
+        <fog attach="fog" args={["#000001", 10, 100]} />
+        <Stars radius={1000} depth={1000} count={5000} factor={20} saturation={0} fade speed={1} />
         <Spaceship/>
         <Asteroids/>
+        <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
+          <GizmoViewport axisColors={["red", "green", "blue"]} labelColor="white" />
+        </GizmoHelper>
       </Canvas>
     </div>
   );

@@ -1,54 +1,100 @@
-import { Vector3, Camera } from "three";
+import { Vector3 } from "three";
+import type { PerspectiveCamera, OrthographicCamera } from "three";
 
 const controls: Record<string, boolean> = {};
 
-window.addEventListener("keydown", (e) => {
-  controls[e.key.toLowerCase()] = true;
-});
+function easeOutQuad(x: number) {
+  return 1 - (1 - x) * (1 - x)
+}
 
-window.addEventListener("keyup", (e) => {
-  controls[e.key.toLowerCase()] = false;
-});
+if (typeof window !== "undefined") {
+  window.addEventListener("keydown", (e) => {
+    controls[e.key.toLowerCase()] = true;
+  });
+
+  window.addEventListener("keyup", (e) => {
+    controls[e.key.toLowerCase()] = false;
+  });
+}
 
 let jawVelocity = 0;
 let pitchVelocity = 0;
-const shipSpeed = 0.01;
+let steeringVelocity = 0;
+let shipSpeed = 0;
+let turbo = 0;
 
 export function updateShipAxis(
   x: Vector3,
   y: Vector3,
   z: Vector3,
   shipPosition: Vector3,
-  camera: Camera
+  camera: PerspectiveCamera | OrthographicCamera,
+  delta: number
 ) {
-  jawVelocity = 0;
-  pitchVelocity = 0;
+  // Normalize to 60 FPS
+  const deltaTime = delta * 60;
+  
+  jawVelocity *= Math.pow(0.93, deltaTime);
+  pitchVelocity *= Math.pow(0.93, deltaTime);
+  steeringVelocity *= Math.pow(0.93, deltaTime);
+ 
+  if(controls[' ']) {
+    shipSpeed += 0.002 * deltaTime
+  } else {
+    shipSpeed *= Math.pow(0.95, deltaTime)
+  }
+  shipSpeed = Math.max(shipSpeed, 0)
 
   if (controls["a"]) {
-    jawVelocity = 0.025;
+    jawVelocity = 0.015;
   }
 
   if (controls["d"]) {
-    jawVelocity = -0.025;
+    jawVelocity = -0.015;
   }
 
   if (controls["s"]) {
-    pitchVelocity = 0.025;
+    pitchVelocity = 0.015;
   }
 
   if (controls["w"]) {
-    pitchVelocity = -0.025;
+    pitchVelocity = -0.015;
   }
 
-  x.applyAxisAngle(z, jawVelocity)
-  y.applyAxisAngle(z, jawVelocity)
+  if (controls["q"]) {
+    steeringVelocity = 0.01;
+  }
 
-  y.applyAxisAngle(x, pitchVelocity)
-  z.applyAxisAngle(x, pitchVelocity)
+  if (controls["e"]) {
+    steeringVelocity = -0.01;
+  }
+
+  x.applyAxisAngle(z, jawVelocity * deltaTime)
+  y.applyAxisAngle(z, jawVelocity * deltaTime)
+
+  y.applyAxisAngle(x, pitchVelocity * deltaTime)
+  z.applyAxisAngle(x, pitchVelocity * deltaTime)
+
+  x.applyAxisAngle(y, steeringVelocity * deltaTime)
+  z.applyAxisAngle(y, steeringVelocity * deltaTime)
 
   x.normalize()
   y.normalize()
   z.normalize()
 
-  shipPosition.add(z.clone().multiplyScalar(-shipSpeed))
+  if (controls.shift) {
+    turbo += 0.03 * deltaTime
+  } else {
+    turbo *= Math.pow(0.95, deltaTime)
+  }
+  turbo = Math.min(Math.max(turbo, 0), 1)
+
+  const turboSpeed = easeOutQuad(turbo) * 0.02
+
+  if ("isPerspectiveCamera" in camera && camera.isPerspectiveCamera) {
+    camera.fov = 45 + turboSpeed * 900
+    camera.updateProjectionMatrix()
+  }
+
+  shipPosition.add(z.clone().multiplyScalar((-shipSpeed - (turboSpeed * 5)) * deltaTime))
 }
