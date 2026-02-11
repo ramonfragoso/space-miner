@@ -23,6 +23,29 @@ let steeringVelocity = 0;
 let shipSpeed = 0;
 let turbo = 0;
 
+/** Returns the ship's current effective speed (units/sec). */
+export function getShipSpeed(): number {
+  const turboSpeed = easeOutQuad(turbo) * 0.02;
+  return (shipSpeed + turboSpeed * 5) * 60;
+}
+
+let lastShootTime = 0;
+let shootTriggered = false;
+const SHOOT_COOLDOWN = 70;
+
+export function shoot(): boolean {
+  if (!controls["p"]) {
+    shootTriggered = false;
+    return false;
+  }
+  if (shootTriggered) return false;
+  const now = Date.now();
+  if (now - lastShootTime < SHOOT_COOLDOWN) return false;
+  lastShootTime = now;
+  shootTriggered = true;
+  return true;
+}
+
 export function updateShipAxis(
   x: Vector3,
   y: Vector3,
@@ -31,7 +54,6 @@ export function updateShipAxis(
   camera: PerspectiveCamera | OrthographicCamera,
   delta: number
 ) {
-  // Normalize to 60 FPS
   const deltaTime = delta * 60;
   
   jawVelocity *= Math.pow(0.93, deltaTime);
@@ -92,7 +114,6 @@ export function updateShipAxis(
   const turboSpeed = easeOutQuad(turbo) * 0.02
 
   if ("isPerspectiveCamera" in camera && camera.isPerspectiveCamera) {
-    // console.log(shipSpeed/5)
     camera.fov = 45 + (turboSpeed + Math.min(shipSpeed/5, 0.02)) * 900
     camera.updateProjectionMatrix()
   }
