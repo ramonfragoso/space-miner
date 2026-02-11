@@ -21,6 +21,7 @@ let jawVelocity = 0;
 let pitchVelocity = 0;
 let steeringVelocity = 0;
 let shipSpeed = 0;
+let reverseSpeed = 0;
 let turbo = 0;
 
 /** Returns the ship's current effective speed (units/sec). */
@@ -90,6 +91,14 @@ export function updateShipAxis(
   if (controls["e"]) {
     steeringVelocity = -0.01;
   }
+  console.log(controls)
+
+  if (controls["control"]) {
+    reverseSpeed += 0.0005 * deltaTime;
+  } else {
+    reverseSpeed *= Math.pow(0.95, deltaTime);
+  }
+  reverseSpeed = Math.max(reverseSpeed, 0);
 
   x.applyAxisAngle(z, jawVelocity * deltaTime)
   y.applyAxisAngle(z, jawVelocity * deltaTime)
@@ -118,5 +127,5 @@ export function updateShipAxis(
     camera.updateProjectionMatrix()
   }
 
-  shipPosition.add(z.clone().multiplyScalar((-shipSpeed - (turboSpeed * 5)) * deltaTime))
+  shipPosition.add(z.clone().multiplyScalar((-shipSpeed + reverseSpeed - (turboSpeed * 5)) * deltaTime))
 }
