@@ -8,6 +8,8 @@ import {
 } from "three";
 import { updateShipAxis, shoot, getShipSpeed } from "./controls";
 import { useDebugUI } from "../hooks/useDebugUI";
+import { useGameplay } from "../hooks/useGameplay";
+import { Shield } from "./Shield";
 
 const shipPosition = new Vector3(0, 3, 7)
 
@@ -34,7 +36,9 @@ type SpaceshipProps = ThreeElements["group"]
 export function Spaceship(props: SpaceshipProps) {
   const { scene } = useGLTF('/spaceship.glb');
   const groupRef = useRef<Group>(null);
+  const shieldRef = useRef<Mesh>(null);
   const { laser: laserControls } = useDebugUI();
+  const gameplay = useGameplay();
 
   const raycasterRef = useRef(new Raycaster());
   const coreInstanceRef = useRef<InstancedMesh>(null);
@@ -92,9 +96,9 @@ export function Spaceship(props: SpaceshipProps) {
     });
   }, [scene]);
 
-  useFrame(({ camera, scene: threeScene, clock }, delta) => {
+  useFrame(({ camera, clock }, delta) => {
     turbineNodes.forEach((turbine) => {
-      turbine.rotation.z += delta * 10; 
+      turbine.rotation.z += delta * 10;
     });
 
     updateShipAxis(x, y, z, shipPosition, camera, delta)
@@ -137,7 +141,7 @@ export function Spaceship(props: SpaceshipProps) {
       const slot = projectilesRef.current.find((p) => !p.active);
       if (slot) {
         slot.active = true;
-        slot.origin.copy(shipPosition).add(z.clone().multiplyScalar(.2));
+        slot.origin.copy(shipPosition);
         slot.direction.copy(z).negate().normalize();
         slot.traveled = 0;
         slot.speed = Math.max(getShipSpeed() + projectileSpeed, minProjectileSpeed);
@@ -149,12 +153,8 @@ export function Spaceship(props: SpaceshipProps) {
     const tmpQuat = new Quaternion();
     const upVec = new Vector3(0, 1, 0);
 
-    const testObjects = threeScene.children.filter(
-      (child) =>
-        child !== groupRef.current &&
-        child !== coreInstanceRef.current &&
-        child !== glowInstanceRef.current
-    );
+    // Raycast directly against asteroid InstancedMeshes (shared via context)
+    const asteroidMeshes = gameplay.asteroidMeshesRef.current;
 
     projectilesRef.current.forEach((proj, i) => {
       if (!proj.active) {
@@ -180,9 +180,23 @@ export function Spaceship(props: SpaceshipProps) {
 
       raycasterRef.current.set(pos, proj.direction);
       raycasterRef.current.far = proj.speed * delta + PROJECTILE_LENGTH;
-      const intersects = raycasterRef.current.intersectObjects(testObjects, true);
+
+      const intersects = raycasterRef.current.intersectObjects(
+        asteroidMeshes,
+        false
+      );
 
       if (intersects.length > 0) {
+        const hit = intersects[0];
+
+        // --- Gameplay: damage asteroid on hit ---
+        if (hit.object?.userData?.isAsteroid && hit.instanceId !== undefined) {
+          const asteroidName: string = hit.object.userData.asteroidName;
+          const asteroidId = `${asteroidName}_${hit.instanceId}`;
+          const damage = gameplay.getDamageMultiplier();
+          gameplay.damageAsteroid(asteroidId, damage);
+        }
+
         proj.active = false;
         tmpMatrix.makeScale(0, 0, 0);
         coreInstanceRef.current?.setMatrixAt(i, tmpMatrix);
@@ -214,7 +228,9 @@ export function Spaceship(props: SpaceshipProps) {
         <group {...props} dispose={null} scale={0.03}>
           <primitive object={scene} />
         </group>
+        {/* <Shield ref={shieldRef} /> */}
       </group>
+
 
       {/* Projectile cores (instanced) */}
       <instancedMesh

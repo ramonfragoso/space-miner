@@ -32,30 +32,66 @@ export const useDebugUI = () => {
     color: { value: "#ffffff", label: "Base Color" },
     emissiveColor: { value: "#00ffaa", label: "Emissive Color" },
     emissiveIntensity: { value: 2, min: 0, max: 10, step: 0.1, label: "Emissive Intensity" },
-  }, { collapsed: false });
+  }, { collapsed: true });
 
   const wingsLightsControls = useControls("Wings Lights", {
     color: { value: "#ffffff", label: "Base Color" },
     emissiveColor: { value: "#ff2200", label: "Emissive Color" },
     emissiveIntensity: { value: 2, min: 0, max: 10, step: 0.1, label: "Emissive Intensity" },
-  }, { collapsed: false });
+  }, { collapsed: true });
 
   const turbineLightsControls = useControls("Turbine Lights", {
     color: { value: "#ffffff", label: "Base Color" },
     emissiveColor: { value: "#00aaff", label: "Emissive Color" },
     emissiveIntensity: { value: 2, min: 0, max: 10, step: 0.1, label: "Emissive Intensity" },
-  }, { collapsed: false });
+  }, { collapsed: true });
 
   const sideLightsControls = useControls("Side Lights", {
     color: { value: "#ffffff", label: "Base Color" },
     emissiveColor: { value: "#ffaa00", label: "Emissive Color" },
     emissiveIntensity: { value: 2, min: 0, max: 10, step: 0.1, label: "Emissive Intensity" },
-  }, { collapsed: false });
+  }, { collapsed: true });
 
   const laserControls = useControls("Laser", {
     maxDistance: { value: 100, min: 10, max: 500, step: 5, label: "Max Distance" },
     projectileSpeed: { value: 10, min: 10, max: 200, step: 5, label: "Projectile Speed" },
     minProjectileSpeed: { value: 30, min: 5, max: 200, step: 5, label: "Min Projectile Speed" },
+  }, { collapsed: true });
+
+  const postProcessingControls = useControls("Post Processing", {
+    strength: { value: 0.1, min: 0, max: 10, step: 0.01, label: "Strength" },
+    radius: { value: 0.1, min: 0, max: 10, step: 0.01, label: "Radius" },
+    threshold: { value: 0.01, min: 0, max: 10, step: 0.01, label: "Threshold" },
+  }, { collapsed: false });
+
+  const gemPlanetControls = useControls("Planet: Gem", {
+    color: { value: "#ff1d00", label: "Color" },
+    emissive: { value: "#7c0000", label: "Emissive" },
+    emissiveIntensity: { value: 17.5, min: 0, max: 50, step: 0.5, label: "Emissive Intensity" },
+  }, { collapsed: false });
+
+  const tealPlanetControls = useControls("Planet: Teal", {
+    color: { value: "#ce0000", label: "Color" },
+    emissive: { value: "#399d84", label: "Emissive" },
+    emissiveIntensity: { value: 11.5, min: 0, max: 50, step: 0.5, label: "Emissive Intensity" },
+  }, { collapsed: false });
+
+  const purplePlanetControls = useControls("Planet: Purple", {
+    color: { value: "#cc88ff", label: "Color" },
+    emissive: { value: "#4a00c1", label: "Emissive" },
+    emissiveIntensity: { value: 9.0, min: 0, max: 50, step: 0.5, label: "Emissive Intensity" },
+  }, { collapsed: false });
+
+  const yellowPlanetControls = useControls("Planet: Yellow", {
+    color: { value: "#ffff06", label: "Color" },
+    emissive: { value: "#5c5c00", label: "Emissive" },
+    emissiveIntensity: { value: 19.0, min: 0, max: 50, step: 0.5, label: "Emissive Intensity" },
+  }, { collapsed: false });
+
+  const lavaPlanetControls = useControls("Planet: Lava", {
+    color: { value: "#6c4019", label: "Color" },
+    emissive: { value: "#ce4600", label: "Emissive" },
+    emissiveIntensity: { value: 50.0, min: 0, max: 50, step: 0.5, label: "Emissive Intensity" },
   }, { collapsed: false });
 
   return {
@@ -67,5 +103,11 @@ export const useDebugUI = () => {
     turbineLights: turbineLightsControls,
     sideLights: sideLightsControls,
     laser: laserControls,
+    postProcessing: postProcessingControls,
+    gemPlanet: gemPlanetControls,
+    tealPlanet: tealPlanetControls,
+    purplePlanet: purplePlanetControls,
+    yellowPlanet: yellowPlanetControls,
+    lavaPlanet: lavaPlanetControls,
   };
 };

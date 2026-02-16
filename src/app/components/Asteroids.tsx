@@ -1,11 +1,15 @@
 "use client";
 import { useRef, useMemo, useEffect } from "react";
-import { Sparkles, useGLTF } from "@react-three/drei";
+import { useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { useDebugUI } from "../hooks/useDebugUI";
+import { useGameplay } from "../hooks/useGameplay";
+import type { AsteroidSizeType } from "../contexts/GameplayContext";
 
 interface AsteroidData {
+  id: string;
+  gameplayType: AsteroidSizeType;
   position: THREE.Vector3;
   rotation: THREE.Euler;
   rotationVelocity: THREE.Vector3;
@@ -20,6 +24,7 @@ interface AsteroidData {
 export function Asteroids() {
   const { nodes } = useGLTF('/asteroids.glb');
   const { asteroids: asteroidControls } = useDebugUI();
+  const gameplay = useGameplay();
 
   const instancedMeshRefs = useRef<Map<string, THREE.InstancedMesh>>(new Map());
 
@@ -46,6 +51,15 @@ export function Asteroids() {
     ...asteroidNamesByType.medium,
     ...asteroidNamesByType.small,
   ], [asteroidNamesByType]);
+
+  /** Map visual type category → gameplay size type */
+  const gameplayTypeForName = useMemo(() => {
+    const map = new Map<string, AsteroidSizeType>();
+    asteroidNamesByType.big.forEach((n) => map.set(n, "large"));
+    asteroidNamesByType.medium.forEach((n) => map.set(n, "medium"));
+    asteroidNamesByType.small.forEach((n) => map.set(n, "small"));
+    return map;
+  }, [asteroidNamesByType]);
 
   const { bigCount, mediumCount, smallCount } = asteroidControls;
 
@@ -91,7 +105,12 @@ export function Asteroids() {
       const instanceIndex = instanceIndices.get(asteroidTypeIndex) || 0;
       instanceIndices.set(asteroidTypeIndex, instanceIndex + 1);
 
+      const gameplayType = gameplayTypeForName.get(asteroidName) ?? "small";
+      const id = `${asteroidName}_${instanceIndex}`;
+
       return {
+        id,
+        gameplayType,
         position,
         rotation,
         rotationVelocity,
@@ -122,8 +141,25 @@ export function Asteroids() {
     });
 
     return { asteroidsData: data, instanceCounts: counts };
-  }, [asteroidNamesByType, allAsteroidNames, bigCount, mediumCount, smallCount]);
+  }, [asteroidNamesByType, allAsteroidNames, gameplayTypeForName, bigCount, mediumCount, smallCount]);
 
+  // ---- Register all asteroids with the gameplay context ----
+  useEffect(() => {
+    asteroidsData.forEach((a) => {
+      gameplay.registerAsteroid(a.id, a.gameplayType);
+    });
+  }, [asteroidsData, gameplay]);
+
+  // ---- Sync InstancedMesh refs into the shared gameplay ref ----
+  useEffect(() => {
+    const meshes = Array.from(instancedMeshRefs.current.values());
+    gameplay.asteroidMeshesRef.current = meshes;
+    return () => {
+      gameplay.asteroidMeshesRef.current = [];
+    };
+  }, [asteroidsData, gameplay]);
+
+  // ---- Initial matrix setup ----
   useEffect(() => {
     const matrix = new THREE.Matrix4();
 
@@ -141,49 +177,74 @@ export function Asteroids() {
       });
 
       instancedMesh.instanceMatrix.needsUpdate = true;
+      // Recompute so the raycaster broad-phase test sees the real positions
+      instancedMesh.computeBoundingSphere();
     });
   }, [asteroidsData, allAsteroidNames]);
 
+  // Counter for periodic bounding-sphere refresh (every ~60 frames)
+  const frameCountRef = useRef(0);
+
+  // ---- Per‑frame: rotate, move, and hide destroyed asteroids ----
   useFrame((state, delta) => {
     const matrix = new THREE.Matrix4();
     const quaternion = new THREE.Quaternion();
 
     asteroidsData.forEach((asteroidData) => {
-      const rotationSpeed = asteroidData.baseRotationSpeed * asteroidControls.spinVelocityMultiplier;
-      asteroidData.rotation.x += asteroidData.rotationVelocity.x * rotationSpeed;
-      asteroidData.rotation.y += asteroidData.rotationVelocity.y * rotationSpeed;
-      asteroidData.rotation.z += asteroidData.rotationVelocity.z * rotationSpeed;
+      const alive = gameplay.isAsteroidAlive(asteroidData.id);
 
-      const movementSpeed = asteroidData.baseMovementSpeed * asteroidControls.moveVelocityMultiplier;
-      asteroidData.position.add(
-        asteroidData.movementDirection.clone().multiplyScalar(movementSpeed * delta)
-      );
+      // Even if dead we still need to set the matrix (to 0‑scale)
+      if (alive) {
+        const rotationSpeed = asteroidData.baseRotationSpeed * asteroidControls.spinVelocityMultiplier;
+        asteroidData.rotation.x += asteroidData.rotationVelocity.x * rotationSpeed;
+        asteroidData.rotation.y += asteroidData.rotationVelocity.y * rotationSpeed;
+        asteroidData.rotation.z += asteroidData.rotationVelocity.z * rotationSpeed;
 
-      const halfSize = 500;
-      if (Math.abs(asteroidData.position.x) > halfSize) {
-        asteroidData.position.x = -Math.sign(asteroidData.position.x) * halfSize;
-      }
-      if (Math.abs(asteroidData.position.y) > halfSize) {
-        asteroidData.position.y = -Math.sign(asteroidData.position.y) * halfSize;
-      }
-      if (Math.abs(asteroidData.position.z) > halfSize) {
-        asteroidData.position.z = -Math.sign(asteroidData.position.z) * halfSize;
+        const movementSpeed = asteroidData.baseMovementSpeed * asteroidControls.moveVelocityMultiplier;
+        asteroidData.position.add(
+          asteroidData.movementDirection.clone().multiplyScalar(movementSpeed * delta)
+        );
+
+        const halfSize = 500;
+        if (Math.abs(asteroidData.position.x) > halfSize) {
+          asteroidData.position.x = -Math.sign(asteroidData.position.x) * halfSize;
+        }
+        if (Math.abs(asteroidData.position.y) > halfSize) {
+          asteroidData.position.y = -Math.sign(asteroidData.position.y) * halfSize;
+        }
+        if (Math.abs(asteroidData.position.z) > halfSize) {
+          asteroidData.position.z = -Math.sign(asteroidData.position.z) * halfSize;
+        }
       }
 
       const asteroidName = allAsteroidNames[asteroidData.asteroidTypeIndex];
       const instancedMesh = instancedMeshRefs.current.get(asteroidName);
 
       if (instancedMesh) {
-        quaternion.setFromEuler(asteroidData.rotation);
-        matrix.compose(
-          asteroidData.position,
-          quaternion,
-          new THREE.Vector3(asteroidData.scale, asteroidData.scale, asteroidData.scale)
-        );
+        if (alive) {
+          quaternion.setFromEuler(asteroidData.rotation);
+          matrix.compose(
+            asteroidData.position,
+            quaternion,
+            new THREE.Vector3(asteroidData.scale, asteroidData.scale, asteroidData.scale)
+          );
+        } else {
+          // Destroyed → collapse to zero scale
+          matrix.makeScale(0, 0, 0);
+        }
         instancedMesh.setMatrixAt(asteroidData.instanceIndex, matrix);
         instancedMesh.instanceMatrix.needsUpdate = true;
       }
     });
+
+    // Periodically recompute bounding spheres so the raycaster broad-phase
+    // test stays valid as asteroids drift.
+    frameCountRef.current++;
+    if (frameCountRef.current % 60 === 0) {
+      instancedMeshRefs.current.forEach((mesh) => {
+        mesh.computeBoundingSphere();
+      });
+    }
   });
 
   return (
@@ -196,19 +257,18 @@ export function Asteroids() {
         if (count === 0) return null;
 
         return (
-          <>
-
-            <instancedMesh
-              key={asteroidName}
-              ref={(ref) => {
-                if (ref) {
-                  instancedMeshRefs.current.set(asteroidName, ref);
-                }
-              }}
-              args={[node.geometry, node.material, count]}
-              frustumCulled={false}
-            />
-          </>
+          <instancedMesh
+            key={asteroidName}
+            ref={(ref) => {
+              if (ref) {
+                instancedMeshRefs.current.set(asteroidName, ref);
+                // Tag so the Spaceship raycaster can recognise asteroid hits
+                ref.userData = { isAsteroid: true, asteroidName };
+              }
+            }}
+            args={[node.geometry, node.material, count]}
+            frustumCulled={false}
+          />
         );
       })}
     </group>

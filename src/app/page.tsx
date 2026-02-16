@@ -1,41 +1,37 @@
 "use client";
-import { Canvas } from "@react-three/fiber";
 import { Environment } from "@react-three/drei";
-import { EffectComposer, Bloom } from "@react-three/postprocessing";
 import { Stars } from "./components/Stars";
-import * as THREE from "three";
-import { useRef } from "react";
 import { useDebugUI } from "./hooks/useDebugUI";
 import { Leva } from "leva";
 import { Lights } from "./components/Lights";
 import { Spaceship } from "./components/Spaceship";
 import { Asteroids } from "./components/Asteroids";
 import { Planet } from "./components/Planet";
+import { GameplayProvider } from "./contexts/GameplayContext";
+import { GameplayHUD } from "./components/GameplayHUD";
+import WebGPUCanvas from "./components/WebGPUCanvas";
+import { PostProcessing } from "./components/PostProcessing";
 
 export default function Home() {
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-  useDebugUI();
+  const {
+    postProcessing,
+    gemPlanet,
+    tealPlanet,
+    purplePlanet,
+    yellowPlanet,
+    lavaPlanet,
+  } = useDebugUI();
 
   return (
+    <GameplayProvider>
     <div className="w-full h-screen">
       <div className="z-50 absolute  overflow-auto top-1 right-1 rounded-md max-w-[370px] ">
         <Leva fill />
       </div>
 
-      <Canvas
-        shadows
-        dpr={[0.5, 0.8]}
-        camera={{ position: [5, 5, 5], fov: 45, near: 0.1, far: 5000 }}
-        gl={{
-          antialias: true,
-          toneMapping: THREE.ACESFilmicToneMapping,
-          outputColorSpace: THREE.SRGBColorSpace,
-        }}
-        onCreated={({ camera }) => {
-          camera.lookAt(0, 0, 0);
-          cameraRef.current = camera as THREE.PerspectiveCamera;
-        }}
-      >
+      <GameplayHUD />
+
+      <WebGPUCanvas>
         <Environment background files="/hdr_compressed.hdr" />
         <Lights />
         <fog attach="fog" args={["#000001", 10, 100]} />
@@ -47,52 +43,50 @@ export default function Home() {
         <Planet
           position={[1500, -2500, 1500]}
           size={100}
-          color="#ff4400"
-          emissive="#ff2200"
-          emissiveIntensity={5}
+          color={gemPlanet.color}
+          emissive={gemPlanet.emissive}
+          emissiveIntensity={gemPlanet.emissiveIntensity}
           textureType="gem"
         />
         <Planet
           position={[-1500, -1500, -1500]}
           size={200}
-          color="#11aa88"
-          emissive="#66aa99"
-          emissiveIntensity={2.5}
+          color={tealPlanet.color}
+          emissive={tealPlanet.emissive}
+          emissiveIntensity={tealPlanet.emissiveIntensity}
           textureType="abstract3"
         />
         <Planet
           position={[-2000, -1500, -1500]}
           size={100}
-          color="#cc88ff"
-          emissive="#6611ee"
-          emissiveIntensity={12}
+          color={purplePlanet.color}
+          emissive={purplePlanet.emissive}
+          emissiveIntensity={purplePlanet.emissiveIntensity}
           textureType="abstract3"
         />
         <Planet
           position={[100, 0, 2500]}
           size={300}
-          color="#ffff88"
-          emissive="#888800"
-          emissiveIntensity={15}
+          color={yellowPlanet.color}
+          emissive={yellowPlanet.emissive}
+          emissiveIntensity={yellowPlanet.emissiveIntensity}
           textureType="abstract"
         />
         <Planet
           position={[-2000, 3000, -2000]}
           size={900}
-          color="#ff7700"
-          emissive="#993300"
-          emissiveIntensity={30}
+          color={lavaPlanet.color}
+          emissive={lavaPlanet.emissive}
+          emissiveIntensity={lavaPlanet.emissiveIntensity}
           textureType="lava"
         />
-        <EffectComposer>
-          <Bloom
-            mipmapBlur
-            luminanceThreshold={1}
-            intensity={1.5}
-            luminanceSmoothing={0.025}
+        <PostProcessing
+          strength={postProcessing.strength}
+          radius={postProcessing.radius}
+          threshold={postProcessing.threshold}
           />
-        </EffectComposer>
-      </Canvas>
+      </WebGPUCanvas>
     </div>
+    </GameplayProvider>
   );
 }

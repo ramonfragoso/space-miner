@@ -91,7 +91,6 @@ export function updateShipAxis(
   if (controls["e"]) {
     steeringVelocity = -0.01;
   }
-  console.log(controls)
 
   if (controls["control"]) {
     reverseSpeed += 0.0005 * deltaTime;
