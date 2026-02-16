@@ -25,18 +25,18 @@ export default function Home() {
   return (
     <GameplayProvider>
     <div className="w-full h-screen">
-      <div className="z-50 absolute  overflow-auto top-1 right-1 rounded-md max-w-[370px] ">
-        <Leva fill />
+      <div className="z-50 absolute overflow-auto top-1 right-1 rounded-md max-w-[370px] max-h-screen ">
+        <Leva fill collapsed/>
       </div>
 
       <GameplayHUD />
 
       <WebGPUCanvas>
-        <Environment background files="/hdr_compressed.hdr" />
+        <Environment backgroundIntensity={2} background files="/hdr_compressed.hdr" />
         <Lights />
         <fog attach="fog" args={["#000001", 10, 100]} />
         <Stars radius={1000} depth={2000} count={10000} factor={32} saturation={1} fade speed={1} />
-        <Stars radius={10} depth={2000} count={30000} factor={1} saturation={1} fade speed={1} />
+        <Stars radius={100} depth={2000} count={30000} factor={1} saturation={1} fade speed={1} />
         <Spaceship />
         <Asteroids />
 
