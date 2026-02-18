@@ -37,7 +37,7 @@ export function Spaceship(props: SpaceshipProps) {
   const { scene } = useGLTF('/spaceship.glb');
   const groupRef = useRef<Group>(null);
   const shieldRef = useRef<Mesh>(null);
-  const { laser: laserControls } = useDebugUI();
+  const { laser: laserControls, shipOtherMaterials: otherMaterialsControls } = useDebugUI();
   const gameplay = useGameplay();
 
   const raycasterRef = useRef(new Raycaster());
@@ -45,7 +45,6 @@ export function Spaceship(props: SpaceshipProps) {
   const glowInstanceRef = useRef<InstancedMesh>(null);
   const coreMaterialRef = useRef<MeshStandardMaterial>(null);
   const glowMaterialRef = useRef<MeshStandardMaterial>(null);
-
   const projectilesRef = useRef<Projectile[]>(
     Array.from({ length: MAX_PROJECTILES }, () => ({
       active: false,
@@ -73,35 +72,40 @@ export function Spaceship(props: SpaceshipProps) {
     scene.traverse((child) => {
       if (!child.isObject3D || !(child as Mesh).isMesh) return;
       const mesh = child as Mesh;
-      const name = mesh.name.toLowerCase();
-
-      if (name === 'light1' || name === 'light2') {
-        const mat = mesh.material as MeshStandardMaterial;
-        if (mat?.isMeshStandardMaterial) {
-          mat.emissive.set('#ff4400');
-          mat.emissiveIntensity = 15;
-          mat.needsUpdate = true;
-        }
-      }
-
       const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       materials.forEach((m) => {
         const stdMat = m as MeshStandardMaterial;
-        if (stdMat?.isMeshStandardMaterial && stdMat.name.toLowerCase().includes('light')) {
+        if (stdMat?.isMeshStandardMaterial && stdMat.name === 'sidelights') {
           stdMat.emissive.set('#ff4400');
           stdMat.emissiveIntensity = 15;
           stdMat.needsUpdate = true;
         }
+        else if (stdMat?.isMeshStandardMaterial && stdMat.name === 'winglights') {
+          stdMat.emissive.set('#0044ff');
+          stdMat.emissiveIntensity = 15;
+          stdMat.needsUpdate = true;
+        }
+        else if (stdMat?.isMeshStandardMaterial && stdMat.name === 'turbinelights') {
+          stdMat.emissive.set('#ff0044');
+          stdMat.emissiveIntensity = 25;
+          stdMat.needsUpdate = true;
+        }
+        else if (stdMat?.isMeshStandardMaterial) {
+          stdMat.emissive.set(otherMaterialsControls.emissiveColor);
+          stdMat.emissiveIntensity = otherMaterialsControls.emissiveIntensity;
+          stdMat.needsUpdate = true;
+        }
       });
     });
-  }, [scene]);
+  }, [scene, otherMaterialsControls]);
 
   useFrame(({ camera, clock }, delta) => {
     turbineNodes.forEach((turbine) => {
-      turbine.rotation.z += delta * 10;
+      turbine.rotation.z += delta * 5;
     });
 
     updateShipAxis(x, y, z, shipPosition, camera, delta)
+    gameplay.shipPositionRef.current.copy(shipPosition)
     const rotMatrix = new Matrix4().makeBasis(x, y, z)
 
     const matrix = new Matrix4()
@@ -228,9 +232,8 @@ export function Spaceship(props: SpaceshipProps) {
         <group {...props} dispose={null} scale={0.03}>
           <primitive object={scene} />
         </group>
-        {/* <Shield ref={shieldRef} /> */}
+        <Shield ref={shieldRef} />
       </group>
-
 
       {/* Projectile cores (instanced) */}
       <instancedMesh

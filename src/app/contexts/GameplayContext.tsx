@@ -7,7 +7,7 @@ import React, {
   type ReactNode,
   type MutableRefObject,
 } from "react";
-import type { InstancedMesh } from "three";
+import { Vector3, type InstancedMesh } from "three";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -82,6 +82,16 @@ export interface GameplayContextValue {
 
   /* ---- shared mesh refs (for direct raycasting) ---- */
   asteroidMeshesRef: MutableRefObject<InstancedMesh[]>;
+  shipPositionRef: MutableRefObject<Vector3>;
+
+  /* ---- shield collision callback (called from Asteroids useFrame) ---- */
+  onShieldCollisionRef: MutableRefObject<
+    ((data: {
+      uv: [number, number];
+      direction: [number, number, number];
+      asteroidId: string;
+    }) => void) | null
+  >;
 }
 
 // ---------------------------------------------------------------------------
@@ -106,6 +116,18 @@ export function GameplayProvider({ children }: { children: ReactNode }) {
   // Shared ref: Asteroids component pushes its InstancedMesh refs here
   // so the Spaceship can raycast against them directly.
   const asteroidMeshesRef = useRef<InstancedMesh[]>([]);
+
+  // Shared ref: Spaceship writes its position here each frame for shield-asteroid collision.
+  const shipPositionRef = useRef<Vector3>(new Vector3());
+
+  // Callback ref: Shield (or other) registers to receive collision events with UV.
+  const onShieldCollisionRef = useRef<
+    ((data: {
+      uv: [number, number];
+      direction: [number, number, number];
+      asteroidId: string;
+    }) => void) | null
+  >(null);
 
   // ----- state mirrors for React re‑renders (HUD / UI) -----
   const [coins, setCoins] = useState(0);
@@ -262,6 +284,8 @@ export function GameplayProvider({ children }: { children: ReactNode }) {
     getShieldMultiplier,
 
     asteroidMeshesRef,
+    shipPositionRef,
+    onShieldCollisionRef,
   };
 
   return (

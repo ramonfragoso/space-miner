@@ -15,6 +15,7 @@ import { PostProcessing } from "./components/PostProcessing";
 export default function Home() {
   const {
     postProcessing,
+    environment,
     gemPlanet,
     tealPlanet,
     purplePlanet,
@@ -32,7 +33,12 @@ export default function Home() {
       <GameplayHUD />
 
       <WebGPUCanvas>
-        <Environment backgroundIntensity={2} background files="/hdr_compressed.hdr" />
+        <Environment
+          backgroundIntensity={environment.backgroundIntensity}
+          environmentIntensity={environment.environmentIntensity}
+          background={environment.background}
+          files="/hdr_compressed.hdr"
+        />
         <Lights />
         <fog attach="fog" args={["#000001", 10, 100]} />
         <Stars radius={1000} depth={2000} count={10000} factor={32} saturation={1} fade speed={1} />

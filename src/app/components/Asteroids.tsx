@@ -6,6 +6,13 @@ import * as THREE from "three";
 import { useDebugUI } from "../hooks/useDebugUI";
 import { useGameplay } from "../hooks/useGameplay";
 import type { AsteroidSizeType } from "../contexts/GameplayContext";
+import {
+  buildConvexHullFromGeometry,
+  distanceFromPointToConvexHull,
+  directionToSphereUV,
+} from "../utils/asteroidCollision";
+
+const SHIELD_RADIUS = 0.1;
 
 interface AsteroidData {
   id: string;
@@ -27,6 +34,13 @@ export function Asteroids() {
   const gameplay = useGameplay();
 
   const instancedMeshRefs = useRef<Map<string, THREE.InstancedMesh>>(new Map());
+  const asteroidMatrixRef = useRef(new THREE.Matrix4());
+  const asteroidMatrixInvRef = useRef(new THREE.Matrix4());
+  const shipPosLocalRef = useRef(new THREE.Vector3());
+  const scaleVecRef = useRef(new THREE.Vector3());
+  const closestPointLocalRef = useRef(new THREE.Vector3());
+  const closestPointWorldRef = useRef(new THREE.Vector3());
+  const impactDirRef = useRef(new THREE.Vector3());
 
   const asteroidNamesByType = useMemo(() => ({
     big: [
@@ -62,6 +76,22 @@ export function Asteroids() {
   }, [asteroidNamesByType]);
 
   const { bigCount, mediumCount, smallCount } = asteroidControls;
+
+  /** Convex hull per asteroid geometry (model space), built once when nodes load */
+  const convexHullsByAsteroidName = useMemo(() => {
+    const hulls = new Map<string, ReturnType<typeof buildConvexHullFromGeometry>>();
+    if (!nodes) return hulls;
+
+    allAsteroidNames.forEach((asteroidName) => {
+      const node = nodes[asteroidName as keyof typeof nodes] as THREE.Mesh | undefined;
+      const geometry = node?.geometry;
+      if (geometry) {
+        const hull = buildConvexHullFromGeometry(geometry);
+        if (hull) hulls.set(asteroidName, hull);
+      }
+    });
+    return hulls;
+  }, [nodes, allAsteroidNames]);
 
   const { asteroidsData, instanceCounts } = useMemo(() => {
     const instanceIndices = new Map<number, number>();
@@ -192,6 +222,7 @@ export function Asteroids() {
 
     asteroidsData.forEach((asteroidData) => {
       const alive = gameplay.isAsteroidAlive(asteroidData.id);
+      const asteroidName = allAsteroidNames[asteroidData.asteroidTypeIndex];
 
       // Even if dead we still need to set the matrix (to 0‑scale)
       if (alive) {
@@ -215,9 +246,51 @@ export function Asteroids() {
         if (Math.abs(asteroidData.position.z) > halfSize) {
           asteroidData.position.z = -Math.sign(asteroidData.position.z) * halfSize;
         }
+
+        // Shield-asteroid collision (convex hull)
+        const hullData = convexHullsByAsteroidName.get(asteroidName);
+        if (hullData) {
+          const shipPos = gameplay.shipPositionRef.current;
+          const maxDist =
+            hullData.boundingRadius * asteroidData.scale + SHIELD_RADIUS;
+          const dx = Math.abs(asteroidData.position.x - shipPos.x);
+          const dy = Math.abs(asteroidData.position.y - shipPos.y);
+          const dz = Math.abs(asteroidData.position.z - shipPos.z);
+          if (dx <= maxDist && dy <= maxDist && dz <= maxDist) {
+            scaleVecRef.current.setScalar(asteroidData.scale);
+            asteroidMatrixRef.current.compose(
+              asteroidData.position,
+              quaternion.setFromEuler(asteroidData.rotation),
+              scaleVecRef.current
+            );
+            asteroidMatrixInvRef.current.copy(asteroidMatrixRef.current).invert();
+            shipPosLocalRef.current
+              .copy(shipPos)
+              .applyMatrix4(asteroidMatrixInvRef.current);
+            const distToHull = distanceFromPointToConvexHull(
+              shipPosLocalRef.current,
+              hullData,
+              closestPointLocalRef.current
+            );
+            if (distToHull < SHIELD_RADIUS) {
+              closestPointWorldRef.current
+                .copy(closestPointLocalRef.current)
+                .applyMatrix4(asteroidMatrixRef.current);
+              impactDirRef.current
+                .subVectors(closestPointWorldRef.current, shipPos)
+                .normalize();
+              const uv = directionToSphereUV(impactDirRef.current);
+              const dir = impactDirRef.current;
+              gameplay.onShieldCollisionRef.current?.({
+                uv,
+                direction: [dir.x, dir.y, dir.z],
+                asteroidId: asteroidData.id,
+              });
+            }
+          }
+        }
       }
 
-      const asteroidName = allAsteroidNames[asteroidData.asteroidTypeIndex];
       const instancedMesh = instancedMeshRefs.current.get(asteroidName);
 
       if (instancedMesh) {

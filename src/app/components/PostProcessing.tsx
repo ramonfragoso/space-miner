@@ -1,6 +1,6 @@
 "use client";
 import * as THREE from "three/webgpu";
-import { pass, mrt, output, emissive, toneMapping } from "three/tsl";
+import { pass, mrt, output, emissive } from "three/tsl";
 import { bloom } from "three/addons/tsl/display/BloomNode.js";
 import { useThree, useFrame } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
@@ -42,8 +42,6 @@ export function PostProcessing({
     const postProcessing = new THREE.PostProcessing(renderer);
     postProcessing.outputNode = scenePassColor.add(bloomPass);
     postProcessingRef.current = postProcessing;
-    // renderer.toneMapping = THREE.ACESFilmicToneMapping
-    // renderer.outputColorSpace = THREE.SRGBColorSpace
 
     return () => {
       postProcessingRef.current = null;
