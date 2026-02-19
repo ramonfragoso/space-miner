@@ -53,8 +53,17 @@ export const useDebugUI = () => {
   }, { collapsed: true });
 
   const shipOtherMaterialsControls = useControls("Ship Other Materials", {
-    emissiveColor: { value: "#3a1965", label: "Emissive Color" },
-    emissiveIntensity: { value: 0.2, min: 0, max: 1, step: 0.001, label: "Emissive Intensity" },
+    color: { value: "#6f6f6f", label: "Color" },
+    emissive: { value: "#000000", label: "Emissive" },
+    emissiveIntensity: { value: 0.0, min: 0, max: 50, step: 0.01, label: "Emissive Intensity" },
+    roughness: { value: 0.5, min: 0, max: 1, step: 0.01, label: "Roughness" },
+    metalness: { value: 0.5, min: 0, max: 1, step: 0.01, label: "Metalness" },
+    opacity: { value: 1, min: 0, max: 1, step: 0.01, label: "Opacity" },
+    transparent: { value: false, label: "Transparent" },
+    envMapIntensity: { value: 1, min: 0, max: 3, step: 0.01, label: "Env Map Intensity" },
+    normalScale: { value: 5, min: 0, max: 10, step: 0.01, label: "Normal Scale" },
+    wireframe: { value: false, label: "Wireframe" },
+    flatShading: { value: false, label: "Flat Shading" },
   }, { collapsed: true });
 
   const laserControls = useControls("Laser", {

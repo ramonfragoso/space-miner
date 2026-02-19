@@ -68,6 +68,8 @@ export function Spaceship(props: SpaceshipProps) {
     return turbines;
   }, [scene]);
 
+
+
   useMemo(() => {
     scene.traverse((child) => {
       if (!child.isObject3D || !(child as Mesh).isMesh) return;
@@ -90,9 +92,16 @@ export function Spaceship(props: SpaceshipProps) {
           stdMat.emissiveIntensity = 25;
           stdMat.needsUpdate = true;
         }
-        else if (stdMat?.isMeshStandardMaterial) {
-          stdMat.emissive.set(otherMaterialsControls.emissiveColor);
+        else if (stdMat?.isMeshStandardMaterial && stdMat.name.includes('shipbaked')) {
+          stdMat.color.set(otherMaterialsControls.color);
+          stdMat.emissive.set(otherMaterialsControls.emissive);
           stdMat.emissiveIntensity = otherMaterialsControls.emissiveIntensity;
+          stdMat.metalness = otherMaterialsControls.metalness;
+          stdMat.opacity = otherMaterialsControls.opacity;
+          stdMat.transparent = otherMaterialsControls.transparent;
+          stdMat.envMapIntensity = otherMaterialsControls.envMapIntensity;
+          const n = otherMaterialsControls.normalScale;
+          stdMat.normalScale.set(n, n);
           stdMat.needsUpdate = true;
         }
       });
