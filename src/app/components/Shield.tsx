@@ -4,6 +4,7 @@ import { Mesh, Vector3 } from "three";
 import { MeshBasicNodeMaterial } from "three/webgpu";
 import { acos, dot, mx_hsvtorgb, positionLocal, smoothstep, uniform, vec3 } from "three/tsl";
 import { extend, useFrame, type ThreeEvent } from "@react-three/fiber";
+import { useDebounce } from "../hooks/useDebounce";
 import { useDebugUI } from "../hooks/useDebugUI";
 import { useGameplay } from "../hooks/useGameplay";
 
@@ -87,7 +88,7 @@ const Ring = ({ centerDir, onDone, shieldControls }: RingProps) => {
   const doneRef = useRef(false)
 
   useFrame((_, delta) => {
-    tRef.current += delta / 6
+    tRef.current += delta / 1.5
     let t = tRef.current > 1 ? 1 : tRef.current
     t = 1 - Math.pow(1 - t, 1)
 
@@ -110,41 +111,71 @@ const Ring = ({ centerDir, onDone, shieldControls }: RingProps) => {
 
 }
 
+const RING_DEBOUNCE_LIMIT = 3
+const RING_DEBOUNCE_MS = [100, 100, 2000]
+
 export const Shield = forwardRef<Mesh>(function Shield(_, ref) {
   const [rings, setRings] = useState<Rings[]>([])
   const idRef = useRef<number>(0)
   const { shield: shieldControls } = useDebugUI()
   const gameplay = useGameplay()
+  const shieldMeshRef = useRef<Mesh | null>(null)
+  const debouncedInvoke = useDebounce({
+    limit: RING_DEBOUNCE_LIMIT,
+    delayMs: RING_DEBOUNCE_MS,
+  })
+
+  const addRing = useCallback(
+    (center: [number, number, number]) => {
+      debouncedInvoke(() => {
+        setRings((prev) => [...prev, { id: idRef.current++, center }])
+      })
+    },
+    [debouncedInvoke]
+  )
 
   useEffect(() => {
     gameplay.onShieldCollisionRef.current = (data) => {
-      setRings((prev) => [
-        ...prev,
-        {
-          id: idRef.current++,
-          center: data.direction,
-        },
-      ])
+      const mesh = shieldMeshRef.current
+      if (!mesh || !data.intersectionPoint) {
+        addRing(data.direction)
+        return
+      }
+      _localPoint.set(
+        data.intersectionPoint[0],
+        data.intersectionPoint[1],
+        data.intersectionPoint[2],
+      )
+      mesh.worldToLocal(_localPoint)
+      _localPoint.normalize()
+      addRing([_localPoint.x, _localPoint.y, _localPoint.z])
     }
     return () => {
       gameplay.onShieldCollisionRef.current = null
     }
-  }, [gameplay])
+  }, [gameplay, addRing])
 
   const handlePointerDown = useCallback((e: ThreeEvent<MouseEvent>) => {
-    // Convert the world-space hit point to a normalized direction in local space.
-    // This avoids the UV seam entirely — angular distance has no discontinuity.
     _localPoint.copy(e.point)
     e.object.worldToLocal(_localPoint)
     _localPoint.normalize()
-
-    const id = idRef.current++
-    setRings(prev => [...prev, { id, center: [_localPoint.x, _localPoint.y, _localPoint.z] }])
-  }, [])
+    addRing([_localPoint.x, _localPoint.y, _localPoint.z])
+  }, [addRing])
 
   return (
     <>
-      <mesh onPointerDown={handlePointerDown} ref={ref} >
+      <mesh
+        onPointerDown={handlePointerDown}
+        ref={(mesh) => {
+          if (typeof ref === "function") {
+            ref(mesh)
+          } else if (ref) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            ;(ref as any).current = mesh
+          }
+          shieldMeshRef.current = mesh
+        }}
+      >
         <sphereGeometry args={[0.1, 32, 32]} />
         <meshBasicMaterial transparent opacity={0.0} depthTest={false} depthWrite={false} />
       </mesh>

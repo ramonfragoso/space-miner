@@ -115,14 +115,14 @@ export const useDebugUI = () => {
   }, { collapsed: true });
 
   const shieldControls = useControls("Shield", {
-    radius: { value: 0.5, min: 0, max: 1, step: 0.01, label: "Radius" },
+    radius: { value: 1.0, min: 0, max: 1, step: 0.01, label: "Radius" },
     fade: { value: 1.0, min: 0, max: 1, step: 0.01, label: "Fade" },
     hueSeed: { value: 0.5, min: 0, max: 1, step: 0.01, label: "Hue Seed" },
-    thickness: { value: 0.12, min: 0.01, max: 0.5, step: 0.01, label: "Thickness" },
-    feather: { value: 0.02, min: 0, max: 0.1, step: 0.001, label: "Feather" },
-    innerBright: { value: 2.2, min: 0, max: 5, step: 0.1, label: "Inner Brightness" },
-    outerBright: { value: 1.8, min: 0, max: 5, step: 0.1, label: "Outer Brightness" },
-    colorMultiplier: { value: 2.0, min: 0, max: 5, step: 0.1, label: "Color Multiplier" },
+    thickness: { value: 0.03, min: 0.01, max: 0.5, step: 0.01, label: "Thickness" },
+    feather: { value: 0.01, min: 0, max: 0.1, step: 0.001, label: "Feather" },
+    innerBright: { value: 2.3, min: 0, max: 5, step: 0.1, label: "Inner Brightness" },
+    outerBright: { value: 0.9, min: 0, max: 5, step: 0.1, label: "Outer Brightness" },
+    colorMultiplier: { value: 4.7, min: 0, max: 5, step: 0.1, label: "Color Multiplier" },
   }, { collapsed: false });
 
   return {

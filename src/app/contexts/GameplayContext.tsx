@@ -90,6 +90,20 @@ export interface GameplayContextValue {
       uv: [number, number];
       direction: [number, number, number];
       asteroidId: string;
+      /** Intersection point on hull in world space (used for ring center). */
+      intersectionPoint: [number, number, number];
+    }) => void) | null
+  >;
+  /** Shield damage (e.g. HP) – called at most once per debounce window from Asteroids. */
+  onShieldDamageRef: MutableRefObject<
+    ((data: {
+      uv: [number, number];
+      direction: [number, number, number];
+      asteroidId: string;
+      /** Asteroid center in world space (for push direction). */
+      asteroidCenter: [number, number, number];
+      /** Intersection point on hull in world space. */
+      intersectionPoint: [number, number, number];
     }) => void) | null
   >;
 }
@@ -126,6 +140,18 @@ export function GameplayProvider({ children }: { children: ReactNode }) {
       uv: [number, number];
       direction: [number, number, number];
       asteroidId: string;
+      intersectionPoint: [number, number, number];
+    }) => void) | null
+  >(null);
+
+  // Callback ref: HP damage from shield hit – Asteroids calls this at most once per 2200ms.
+  const onShieldDamageRef = useRef<
+    ((data: {
+      uv: [number, number];
+      direction: [number, number, number];
+      asteroidId: string;
+      asteroidCenter: [number, number, number];
+      intersectionPoint: [number, number, number];
     }) => void) | null
   >(null);
 
@@ -286,6 +312,7 @@ export function GameplayProvider({ children }: { children: ReactNode }) {
     asteroidMeshesRef,
     shipPositionRef,
     onShieldCollisionRef,
+    onShieldDamageRef,
   };
 
   return (

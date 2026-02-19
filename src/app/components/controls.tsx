@@ -24,6 +24,13 @@ let shipSpeed = 0;
 let reverseSpeed = 0;
 let turbo = 0;
 
+let controlsBlockedUntil = 0;
+
+/** Block ship controls for the given duration (ms). Used e.g. after shield damage. */
+export function blockControlsFor(ms: number): void {
+  controlsBlockedUntil = Date.now() + ms;
+}
+
 /** Returns the ship's current effective speed (units/sec). */
 export function getShipSpeed(): number {
   const turboSpeed = easeOutQuad(turbo) * 0.02;
@@ -55,6 +62,8 @@ export function updateShipAxis(
   camera: PerspectiveCamera | OrthographicCamera,
   delta: number
 ) {
+  if (Date.now() < controlsBlockedUntil) return;
+
   const deltaTime = delta * 60;
   
   jawVelocity *= Math.pow(0.93, deltaTime);

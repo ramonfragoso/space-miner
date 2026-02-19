@@ -41,6 +41,9 @@ export function Asteroids() {
   const closestPointLocalRef = useRef(new THREE.Vector3());
   const closestPointWorldRef = useRef(new THREE.Vector3());
   const impactDirRef = useRef(new THREE.Vector3());
+  /** Cooldown (ms) for shield HP damage; damage callback fires at most once per this window. */
+  const SHIELD_DAMAGE_DEBOUNCE_MS = 2200;
+  const shieldDamageCooldownUntilRef = useRef(0);
 
   const asteroidNamesByType = useMemo(() => ({
     big: [
@@ -281,11 +284,25 @@ export function Asteroids() {
                 .normalize();
               const uv = directionToSphereUV(impactDirRef.current);
               const dir = impactDirRef.current;
-              gameplay.onShieldCollisionRef.current?.({
+              const pt = closestPointWorldRef.current;
+              const collisionData = {
                 uv,
-                direction: [dir.x, dir.y, dir.z],
+                direction: [dir.x, dir.y, dir.z] as [number, number, number],
                 asteroidId: asteroidData.id,
-              });
+                intersectionPoint: [pt.x, pt.y, pt.z] as [number, number, number],
+              };
+
+              gameplay.onShieldCollisionRef.current?.(collisionData);
+
+              const now = Date.now();
+              if (now >= shieldDamageCooldownUntilRef.current) {
+                shieldDamageCooldownUntilRef.current = now + SHIELD_DAMAGE_DEBOUNCE_MS;
+                const pos = asteroidData.position;
+                gameplay.onShieldDamageRef.current?.({
+                  ...collisionData,
+                  asteroidCenter: [pos.x, pos.y, pos.z],
+                });
+              }
             }
           }
         }
