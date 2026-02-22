@@ -24,7 +24,11 @@ export interface Projectile {
 export const PROJECTILE_LENGTH_CONST = PROJECTILE_LENGTH;
 export const MAX_PROJECTILES_CONST = MAX_PROJECTILES;
 
-export function useShooting() {
+export interface UseShootingOptions {
+  onShot?: () => void;
+}
+
+export function useShooting(options?: UseShootingOptions) {
   const { laser: laserControls } = useDebugUI();
   const coreInstanceRef = useRef<InstancedMesh>(null);
   const glowInstanceRef = useRef<InstancedMesh>(null);
@@ -62,6 +66,7 @@ export function useShooting() {
         getShipSpeed() + projectileSpeed,
         minProjectileSpeed
       );
+      options?.onShot?.();
     }
   }
 

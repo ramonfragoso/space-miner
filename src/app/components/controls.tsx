@@ -31,10 +31,25 @@ export function blockControlsFor(ms: number): void {
   controlsBlockedUntil = Date.now() + ms;
 }
 
+/** True when space (thrust) or shift (turbo) is pressed. */
+export function isThrustPressed(): boolean {
+  return !!(controls[" "] || controls["shift"]);
+}
+
 /** Returns the ship's current effective speed (units/sec). */
 export function getShipSpeed(): number {
   const turboSpeed = easeOutQuad(turbo) * 0.02;
   return (shipSpeed + turboSpeed * 5) * 60;
+}
+
+/** Normalized ship speed in [0, 1]. shipSpeed raw range is treated as 0–10. */
+export function getNormalizedShipSpeed(): number {
+  return Math.min(Math.max(shipSpeed * 10, 0), 1);
+}
+
+/** Normalized turbo in [0, 1]. turboSpeed raw range 0–0.02 maps to 0–1. */
+export function getNormalizedTurboSpeed(): number {
+  return easeOutQuad(turbo);
 }
 
 let lastShootTime = 0;
@@ -122,7 +137,7 @@ export function updateShipAxis(
   z.normalize()
 
   if (controls.shift) {
-    turbo += 0.03 * deltaTime
+    turbo += 0.02 * deltaTime
   } else {
     turbo *= Math.pow(0.95, deltaTime)
   }
@@ -134,6 +149,5 @@ export function updateShipAxis(
     camera.fov = 45 + (turboSpeed + Math.min(shipSpeed/5, 0.02)) * 900
     camera.updateProjectionMatrix()
   }
-
   shipPosition.add(z.clone().multiplyScalar((-shipSpeed + reverseSpeed - (turboSpeed * 5)) * deltaTime))
 }

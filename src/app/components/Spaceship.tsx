@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useMemo, useEffect } from "react";
+import React, { useRef, useMemo, useEffect, Suspense } from "react";
 import { useGLTF } from "@react-three/drei";
 import { useFrame, ThreeElements } from "@react-three/fiber";
 import {
@@ -13,6 +13,7 @@ import { useShooting } from "../hooks/useShooting";
 import { useProjectileCollision } from "../hooks/useProjectileCollision";
 import { MAX_PROJECTILES_CONST } from "../hooks/useShooting";
 import { Shield } from "./Shield";
+import { EngineSounds, ShotSoundPool } from "./EngineSounds";
 
 const PUSH_DISTANCE = 10;
 const PUSH_DURATION = 3;
@@ -74,7 +75,10 @@ export function Spaceship(props: SpaceshipProps) {
     };
   }, [gameplay]);
 
-  const shooting = useShooting();
+  const shotSoundRef = useRef<{ play: () => void }>(null);
+  const shooting = useShooting({
+    onShot: () => shotSoundRef.current?.play(),
+  });
   const { updateCollisions } = useProjectileCollision(
     shooting.projectilesRef,
     shooting.coreInstanceRef,
@@ -209,6 +213,10 @@ export function Spaceship(props: SpaceshipProps) {
           <primitive object={scene} />
         </group>
         <Shield ref={shieldRef} />
+        <Suspense fallback={null}>
+          <ShotSoundPool ref={shotSoundRef} />
+          <EngineSounds />
+        </Suspense>
       </group>
 
       {/* Projectile cores (instanced) */}
