@@ -15,6 +15,16 @@ const SHOT_SFX_URL = "/sfx/shot.mp3";
 const SHOT_SOUND_POOL_SIZE = 10;
 const DETUNE_MAX = 1200;
 
+const SHOT_FILTER = {
+  convolver: true,
+  loop: false,
+  filter: {
+    type: "highpass" as BiquadFilterType,
+    frequency: 100,
+    q: 0.8,
+  }
+};
+
 export interface AudioConfig {
   loop?: boolean;
   refDistance?: number;
@@ -81,16 +91,6 @@ export function applyAudioConfig(
 
 export const ShotSoundPool = forwardRef<{ play: () => void }, object>(
   function ShotSoundPool(_, ref) {
-    const SHOT_FILTER = {
-      convolver: true,
-      loop: false,
-      filter: {
-        type: "highpass" as BiquadFilterType,
-        frequency: 100,
-        q: 0.8,
-      }
-    };
-
     const { camera } = useThree();
     const buffer = useLoader(THREE.AudioLoader, SHOT_SFX_URL);
     const [listener] = useState(() => new THREE.AudioListener());
@@ -200,7 +200,7 @@ export function EngineSounds() {
     }
   }, [engine1Buffer, engine2Buffer, listener.context]);
 
-  useFrame((state) => {
+  useFrame(() => {
     const engine1 = engine1Ref.current;
     const engine2 = engine2Ref.current;
     if (!engine1 || !engine2) return;

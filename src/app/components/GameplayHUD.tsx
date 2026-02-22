@@ -1,7 +1,6 @@
 "use client";
 import { useGameplay } from "../hooks/useGameplay";
 import {
-  UPGRADE_COSTS,
   ESCAPE_MODULE_COST,
   type UpgradeState,
 } from "../contexts/GameplayContext";
