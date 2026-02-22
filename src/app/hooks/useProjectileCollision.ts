@@ -1,13 +1,12 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, type MutableRefObject } from "react";
 import {
   Matrix4,
   Quaternion,
   Vector3,
   Raycaster,
   type InstancedMesh,
-  type MutableRefObject,
 } from "three";
 import type { Projectile } from "./useShooting";
 import { PROJECTILE_LENGTH_CONST } from "./useShooting";

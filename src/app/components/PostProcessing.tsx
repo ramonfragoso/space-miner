@@ -39,7 +39,7 @@ export function PostProcessing({
 
     const bloomPass = bloom(scenePassEmissive, strength, radius, threshold);
 
-    const postProcessing = new THREE.PostProcessing(renderer);
+    const postProcessing = new THREE.PostProcessing(renderer as unknown as THREE.Renderer);
     postProcessing.outputNode = scenePassColor.add(bloomPass);
     postProcessingRef.current = postProcessing;
 
