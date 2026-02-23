@@ -46,9 +46,9 @@ const HIT_FILTER = {
 };
 
 const EXPLOSION_FILTER = {
-  convolver: true,
+  // convolver: true,
   loop: false,
-  volume: 5.0,
+  volume: 10.0,
   refDistance: 15,
   filter: {
     type: "highpass" as BiquadFilterType,
