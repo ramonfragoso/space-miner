@@ -18,10 +18,11 @@ const DETUNE_MAX = 1200;
 const SHOT_FILTER = {
   convolver: true,
   loop: false,
+  volume: 12.0,
   filter: {
     type: "highpass" as BiquadFilterType,
     frequency: 100,
-    q: 0.8,
+    q: 1.0,
   }
 };
 
@@ -62,7 +63,7 @@ export function applyAudioConfig(
   
   if (config.convolver) {
     const sampleRate = audioContext.sampleRate;
-    const length = sampleRate * 0.5;
+    const length = sampleRate * 0.08;
     const buffer = audioContext.createBuffer(2, length, sampleRate);
 
     for (let ch = 0; ch < 2; ch++) {
@@ -207,7 +208,7 @@ export function EngineSounds() {
     const normShip = getNormalizedShipSpeed();
     const normTurbo = getNormalizedTurboSpeed();
     const fullSpeed = normShip + normTurbo;
-    engine1.setVolume((fullSpeed/2) - 0.8);
+    engine1.setVolume((fullSpeed/2) - 0.2);
     engine1.setDetune((fullSpeed / 2) * 800);
     engine2.setDetune((fullSpeed / 2) * 1100);
     if (isThrustPressed()) {
