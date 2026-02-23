@@ -17,6 +17,8 @@ export function useProjectileCollision(
   coreInstanceRef: MutableRefObject<InstancedMesh | null>,
   glowInstanceRef: MutableRefObject<InstancedMesh | null>,
   gameplay: GameplayContextValue,
+  hitSoundRef?: MutableRefObject<{ playAt: (position: Vector3) => void } | null>,
+  explosionSoundRef?: MutableRefObject<{ playAt: (position: Vector3) => void } | null>,
 ) {
   const raycasterRef = useRef(new Raycaster());
 
@@ -61,7 +63,11 @@ export function useProjectileCollision(
           const asteroidName: string = hit.object.userData.asteroidName;
           const asteroidId = `${asteroidName}_${hit.instanceId}`;
           const damage = gameplay.getDamageMultiplier();
-          gameplay.damageAsteroid(asteroidId, damage);
+          const destroyed = gameplay.damageAsteroid(asteroidId, damage);
+          hitSoundRef?.current?.playAt(hit.point);
+          if (destroyed) {
+            explosionSoundRef?.current?.playAt(hit.point);
+          }
         }
 
         proj.active = false;

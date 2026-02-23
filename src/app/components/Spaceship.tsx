@@ -13,7 +13,7 @@ import { useShooting } from "../hooks/useShooting";
 import { useProjectileCollision } from "../hooks/useProjectileCollision";
 import { MAX_PROJECTILES_CONST } from "../hooks/useShooting";
 import { Shield } from "./Shield";
-import { EngineSounds, ShotSoundPool } from "./EngineSounds";
+import { EngineSounds, ShotSoundPool, HitSoundPool, ExplosionSoundPool, CollisionSoundPool } from "./EngineSounds";
 
 const PUSH_DISTANCE = 10;
 const PUSH_DURATION = 3;
@@ -75,7 +75,21 @@ export function Spaceship(props: SpaceshipProps) {
     };
   }, [gameplay]);
 
+  useEffect(() => {
+    gameplay.onShieldCollisionSoundRef.current = (position) => {
+      collisionSoundRef.current?.playAt(
+        new Vector3(position[0], position[1], position[2])
+      );
+    };
+    return () => {
+      gameplay.onShieldCollisionSoundRef.current = null;
+    };
+  }, [gameplay]);
+
   const shotSoundRef = useRef<{ play: () => void }>(null);
+  const hitSoundRef = useRef<{ playAt: (position: Vector3) => void }>(null);
+  const explosionSoundRef = useRef<{ playAt: (position: Vector3) => void }>(null);
+  const collisionSoundRef = useRef<{ playAt: (position: Vector3) => void }>(null);
   const shooting = useShooting({
     onShot: () => shotSoundRef.current?.play(),
   });
@@ -83,7 +97,9 @@ export function Spaceship(props: SpaceshipProps) {
     shooting.projectilesRef,
     shooting.coreInstanceRef,
     shooting.glowInstanceRef,
-    gameplay
+    gameplay,
+    hitSoundRef,
+    explosionSoundRef
   );
 
   const turbineNodes = useMemo(() => {
@@ -215,6 +231,9 @@ export function Spaceship(props: SpaceshipProps) {
         <Shield ref={shieldRef} />
         <Suspense fallback={null}>
           <ShotSoundPool ref={shotSoundRef} />
+          <HitSoundPool ref={hitSoundRef} />
+          <ExplosionSoundPool ref={explosionSoundRef} />
+          <CollisionSoundPool ref={collisionSoundRef} />
           <EngineSounds />
         </Suspense>
       </group>

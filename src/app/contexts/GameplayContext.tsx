@@ -106,6 +106,10 @@ export interface GameplayContextValue {
       intersectionPoint: [number, number, number];
     }) => void) | null
   >;
+  /** Optional: play positional sound when shield collides with asteroid (intersection point). */
+  onShieldCollisionSoundRef: MutableRefObject<
+    ((position: [number, number, number]) => void) | null
+  >;
 }
 
 // ---------------------------------------------------------------------------
@@ -153,6 +157,11 @@ export function GameplayProvider({ children }: { children: ReactNode }) {
       asteroidCenter: [number, number, number];
       intersectionPoint: [number, number, number];
     }) => void) | null
+  >(null);
+
+  // Optional: play positional sound when shield collides with asteroid.
+  const onShieldCollisionSoundRef = useRef<
+    ((position: [number, number, number]) => void) | null
   >(null);
 
   // ----- state mirrors for React re‑renders (HUD / UI) -----
@@ -313,6 +322,7 @@ export function GameplayProvider({ children }: { children: ReactNode }) {
     shipPositionRef,
     onShieldCollisionRef,
     onShieldDamageRef,
+    onShieldCollisionSoundRef,
   };
 
   return (

@@ -293,6 +293,7 @@ export function Asteroids() {
               };
 
               gameplay.onShieldCollisionRef.current?.(collisionData);
+              gameplay.onShieldCollisionSoundRef.current?.(collisionData.intersectionPoint);
 
               const now = Date.now();
               if (now >= shieldDamageCooldownUntilRef.current) {

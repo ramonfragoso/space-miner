@@ -12,7 +12,13 @@ import {
 const ENGINE1_SFX_URL = "/sfx/engine1.ogg";
 const ENGINE2_SFX_URL = "/sfx/engine2.mp3";
 const SHOT_SFX_URL = "/sfx/shot.mp3";
+const HIT_SFX_URL = "/sfx/hit.mp3";
+const EXPLOSION_SFX_URL = "/sfx/explosion.mp3";
+const COLLISION_SFX_URL = "/sfx/collision.mp3";
 const SHOT_SOUND_POOL_SIZE = 10;
+const HIT_SOUND_POOL_SIZE = 6;
+const EXPLOSION_SOUND_POOL_SIZE = 4;
+const COLLISION_SOUND_POOL_SIZE = 4;
 const DETUNE_MAX = 1200;
 
 const SHOT_FILTER = {
@@ -22,6 +28,44 @@ const SHOT_FILTER = {
   filter: {
     type: "highpass" as BiquadFilterType,
     frequency: 100,
+    q: 1.0,
+  }
+};
+
+const HIT_FILTER = {
+  convolver: true,
+  loop: false,
+  volume: 70.0,
+  refDistance: 8,
+  detune: -400,
+  filter: {
+    type: "highpass" as BiquadFilterType,
+    frequency: 100,
+    q: 1.0,
+  }
+};
+
+const EXPLOSION_FILTER = {
+  convolver: true,
+  loop: false,
+  volume: 5.0,
+  refDistance: 15,
+  filter: {
+    type: "highpass" as BiquadFilterType,
+    frequency: 60,
+    q: 1.0,
+  }
+};
+
+const COLLISION_FILTER = {
+  // convolver: true,
+  loop: false,
+  volume: 8.0,
+  refDistance: 10,
+  detune: 200,
+  filter: {
+    type: "highpass" as BiquadFilterType,
+    frequency: 190,
     q: 1.0,
   }
 };
@@ -148,6 +192,173 @@ export const ShotSoundPool = forwardRef<{ play: () => void }, object>(
       </>
     );
   }
+);
+
+export const HitSoundPool = forwardRef<
+  { playAt: (position: THREE.Vector3) => void },
+  object
+>(function HitSoundPool(_, ref) {
+  const { camera } = useThree();
+  const buffer = useLoader(THREE.AudioLoader, HIT_SFX_URL);
+  const [listener] = useState(() => new THREE.AudioListener());
+  const groupRefs = useRef<(THREE.Group | null)[]>(
+    Array.from({ length: HIT_SOUND_POOL_SIZE }, () => null)
+  );
+  const soundRefs = useRef<(THREE.PositionalAudio | null)[]>(
+    Array.from({ length: HIT_SOUND_POOL_SIZE }, () => null)
+  );
+  const indexRef = useRef(0);
+
+  useEffect(() => {
+    camera.add(listener);
+    return () => {
+      camera.remove(listener);
+    };
+  }, [camera, listener]);
+
+  useEffect(() => {
+    if (!buffer) return;
+    const ctx = listener.context;
+    soundRefs.current.forEach((sound) =>
+      applyAudioConfig(sound, buffer, ctx, HIT_FILTER)
+    );
+  }, [buffer, listener.context]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      playAt: (position: THREE.Vector3) => {
+        const groups = groupRefs.current;
+        const sounds = soundRefs.current;
+        const i = indexRef.current % sounds.length;
+        indexRef.current = i + 1;
+        const group = groups[i];
+        const sound = sounds[i];
+        if (group && sound) {
+          group.position.copy(position);
+          sound.play();
+        }
+      },
+    }),
+    []
+  );
+
+  return (
+    <>
+      {Array.from({ length: HIT_SOUND_POOL_SIZE }, (_, i) => (
+        <group
+          key={i}
+          ref={(el) => {
+            groupRefs.current[i] = el;
+          }}
+        >
+          <positionalAudio
+            ref={(el) => {
+              soundRefs.current[i] = el;
+              if (el && buffer)
+                applyAudioConfig(el, buffer, listener.context, HIT_FILTER);
+            }}
+            args={[listener]}
+          />
+        </group>
+      ))}
+    </>
+  );
+});
+
+function createPositionalSoundPool(
+  url: string,
+  poolSize: number,
+  config: AudioConfig,
+  displayName: string
+) {
+  const Pool = forwardRef<
+    { playAt: (position: THREE.Vector3) => void },
+    object
+  >(function Pool(_, ref) {
+    const { camera } = useThree();
+    const buffer = useLoader(THREE.AudioLoader, url);
+    const [listener] = useState(() => new THREE.AudioListener());
+    const groupRefs = useRef<(THREE.Group | null)[]>(
+      Array.from({ length: poolSize }, () => null)
+    );
+    const soundRefs = useRef<(THREE.PositionalAudio | null)[]>(
+      Array.from({ length: poolSize }, () => null)
+    );
+    const indexRef = useRef(0);
+
+    useEffect(() => {
+      camera.add(listener);
+      return () => {
+        camera.remove(listener);
+      };
+    }, [camera, listener]);
+
+    useEffect(() => {
+      if (!buffer) return;
+      const ctx = listener.context;
+      soundRefs.current.forEach((sound) =>
+        applyAudioConfig(sound, buffer, ctx, config)
+      );
+    }, [buffer, listener.context]);
+
+    useImperativeHandle(
+      ref,
+      () => ({
+        playAt: (position: THREE.Vector3) => {
+          const groups = groupRefs.current;
+          const sounds = soundRefs.current;
+          const i = indexRef.current % sounds.length;
+          indexRef.current = i + 1;
+          const group = groups[i];
+          const sound = sounds[i];
+          if (group && sound) {
+            group.position.copy(position);
+            sound.play();
+          }
+        },
+      }),
+      []
+    );
+
+    return (
+      <>
+        {Array.from({ length: poolSize }, (_, i) => (
+          <group
+            key={i}
+            ref={(el) => {
+              groupRefs.current[i] = el;
+            }}
+          >
+            <positionalAudio
+              ref={(el) => {
+                soundRefs.current[i] = el;
+                if (el && buffer)
+                  applyAudioConfig(el, buffer, listener.context, config);
+              }}
+              args={[listener]}
+            />
+          </group>
+        ))}
+      </>
+    );
+  });
+  Pool.displayName = displayName;
+  return Pool;
+}
+
+export const ExplosionSoundPool = createPositionalSoundPool(
+  EXPLOSION_SFX_URL,
+  EXPLOSION_SOUND_POOL_SIZE,
+  EXPLOSION_FILTER,
+  "ExplosionSoundPool"
+);
+
+export const CollisionSoundPool = createPositionalSoundPool(
+  COLLISION_SFX_URL,
+  COLLISION_SOUND_POOL_SIZE,
+  COLLISION_FILTER,
+  "CollisionSoundPool"
 );
 
 const ENGINE_FILTER = {
