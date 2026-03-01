@@ -1,8 +1,9 @@
 "use client";
 import { useRef, useMemo, useEffect } from "react";
-import { useGLTF } from "@react-three/drei";
+import { useGLTF, useTexture } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { DestructibleMesh, FractureOptions } from "@dgreenheck/three-pinata";
 import { useDebugUI } from "../hooks/useDebugUI";
 import { useGameplay } from "../hooks/useGameplay";
 import type { AsteroidSizeType } from "../contexts/GameplayContext";
@@ -13,6 +14,11 @@ import {
 } from "../utils/asteroidCollision";
 
 const SHIELD_RADIUS = 0.1;
+const FRAGMENT_COUNT = 16;
+const FRAGMENT_ANIMATION_DURATION_MS = 2500;
+const FRAGMENT_SPREAD_SPEED = 5;
+
+const ASTEROID_INNER_BASE = "/textures/asteroid_inner/";
 
 interface AsteroidData {
   id: string;
@@ -32,6 +38,7 @@ export function Asteroids() {
   const { nodes } = useGLTF('/asteroids.glb');
   const { asteroids: asteroidControls } = useDebugUI();
   const gameplay = useGameplay();
+  const { resetKey } = gameplay;
 
   const instancedMeshRefs = useRef<Map<string, THREE.InstancedMesh>>(new Map());
   const asteroidMatrixRef = useRef(new THREE.Matrix4());
@@ -44,6 +51,9 @@ export function Asteroids() {
   /** Cooldown (ms) for shield HP damage; damage callback fires at most once per this window. */
   const SHIELD_DAMAGE_DEBOUNCE_MS = 2200;
   const shieldDamageCooldownUntilRef = useRef(0);
+
+  /** Fracture fragments from dead asteroids */
+  const fragmentsGroupRef = useRef<THREE.Group>(null);
 
   const asteroidNamesByType = useMemo(() => ({
     big: [
@@ -68,6 +78,40 @@ export function Asteroids() {
     ...asteroidNamesByType.medium,
     ...asteroidNamesByType.small,
   ], [asteroidNamesByType]);
+
+  const innerTextures = useTexture({
+    map: `${ASTEROID_INNER_BASE}Lava_004_COLOR.jpg`,
+    aoMap: `${ASTEROID_INNER_BASE}Lava_004_OCC.jpg`,
+    roughnessMap: `${ASTEROID_INNER_BASE}Lava_004_ROUGH.jpg`,
+    displacementMap: `${ASTEROID_INNER_BASE}Lava_004_DISP.png`,
+    normalMap: `${ASTEROID_INNER_BASE}Lava_004_NORM.jpg`,
+  });
+
+  const corpseMaterialsByAsteroidName = useMemo(() => {
+    const map = new Map<
+      string,
+      { outer: THREE.MeshStandardMaterial; inner: THREE.MeshStandardMaterial }
+    >();
+    if (!nodes) return map;
+    const inner = new THREE.MeshStandardMaterial({
+      map: innerTextures.map,
+      aoMap: innerTextures.aoMap,
+      aoMapIntensity: 1,
+      roughnessMap: innerTextures.roughnessMap,
+      normalMap: innerTextures.normalMap,
+      color: 0xaaaaaa,
+    });
+    allAsteroidNames.forEach((name) => {
+      const node = nodes[name as keyof typeof nodes] as THREE.Mesh | undefined;
+      const mat = node?.material;
+      if (mat) {
+        const baseMat = Array.isArray(mat) ? mat[0] : mat;
+        const outer = baseMat.clone() as THREE.MeshStandardMaterial;
+        map.set(name, { outer, inner });
+      }
+    });
+    return map;
+  }, [nodes, allAsteroidNames, innerTextures]);
 
   /** Map visual type category → gameplay size type */
   const gameplayTypeForName = useMemo(() => {
@@ -174,7 +218,7 @@ export function Asteroids() {
     });
 
     return { asteroidsData: data, instanceCounts: counts };
-  }, [asteroidNamesByType, allAsteroidNames, gameplayTypeForName, bigCount, mediumCount, smallCount]);
+  }, [asteroidNamesByType, allAsteroidNames, gameplayTypeForName, bigCount, mediumCount, smallCount, resetKey]);
 
   // ---- Register all asteroids with the gameplay context ----
   useEffect(() => {
@@ -182,6 +226,103 @@ export function Asteroids() {
       gameplay.registerAsteroid(a.id, a.gameplayType);
     });
   }, [asteroidsData, gameplay]);
+
+  // ---- Fracture on asteroid death (event-driven, runs once per destruction) ----
+  useEffect(() => {
+    gameplay.onAsteroidDestroyedRef.current = (asteroidId: string) => {
+      const asteroidData = asteroidsData.find((a) => a.id === asteroidId);
+      if (!asteroidData) return;
+
+      const asteroidName = allAsteroidNames[asteroidData.asteroidTypeIndex];
+      const node = nodes?.[asteroidName as keyof typeof nodes] as
+        | THREE.Mesh
+        | undefined;
+      const materials = corpseMaterialsByAsteroidName.get(asteroidName);
+      const fragmentsGroup = fragmentsGroupRef.current;
+      if (!node?.geometry || !materials || !fragmentsGroup) return;
+
+      try {
+        const geometry = node.geometry.clone();
+        const mesh = new DestructibleMesh(
+          geometry,
+          materials.outer,
+          materials.inner
+        );
+        mesh.position.set(
+          asteroidData.position.x,
+          asteroidData.position.y,
+          asteroidData.position.z
+        );
+        mesh.rotation.set(
+          asteroidData.rotation.x,
+          asteroidData.rotation.y,
+          asteroidData.rotation.z
+        );
+        mesh.scale.setScalar(asteroidData.scale);
+        mesh.updateMatrixWorld(true);
+
+        const options = new FractureOptions({
+          fractureMethod: "simple",
+          fragmentCount: FRAGMENT_COUNT,
+          voronoiOptions: { mode: "3D" },
+        });
+
+        const center = new THREE.Vector3(
+          asteroidData.position.x,
+          asteroidData.position.y,
+          asteroidData.position.z
+        );
+        mesh.fracture(options, (fragment) => {
+          fragment.userData.spawnedAt = performance.now();
+          const dir = new THREE.Vector3()
+            .subVectors(fragment.position, center)
+            .normalize();
+          if (dir.lengthSq() < 1e-6) {
+            dir.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
+          }
+          fragment.userData.spreadDirection = dir;
+          // Clone materials for per-fragment opacity animation
+          const mats = Array.isArray(fragment.material)
+            ? fragment.material
+            : [fragment.material];
+          fragment.material = mats.map((m) => {
+            const clone = m.clone() as THREE.MeshStandardMaterial;
+            clone.transparent = true;
+            clone.opacity = 1;
+            return clone;
+          });
+          fragmentsGroup.add(fragment);
+        });
+
+        mesh.geometry?.dispose();
+      } catch (err) {
+        console.warn("Asteroid fracture failed (non-manifold?):", err);
+      }
+    };
+    return () => {
+      gameplay.onAsteroidDestroyedRef.current = null;
+    };
+  }, [
+    asteroidsData,
+    nodes,
+    corpseMaterialsByAsteroidName,
+    gameplay,
+    allAsteroidNames,
+  ]);
+
+  // ---- Clear fragments when asteroid set is regenerated ----
+  useEffect(() => {
+    const group = fragmentsGroupRef.current;
+    if (group) {
+      while (group.children.length > 0) {
+        const child = group.children[0];
+        group.remove(child);
+        if (child instanceof THREE.Mesh) {
+          child.geometry?.dispose();
+        }
+      }
+    }
+  }, [asteroidsData]);
 
   // ---- Sync InstancedMesh refs into the shared gameplay ref ----
   useEffect(() => {
@@ -218,7 +359,7 @@ export function Asteroids() {
   // Counter for periodic bounding-sphere refresh (every ~60 frames)
   const frameCountRef = useRef(0);
 
-  // ---- Per‑frame: rotate, move, and hide destroyed asteroids ----
+  // ---- Per‑frame: rotate, move, hide destroyed asteroids ----
   useFrame((state, delta) => {
     const matrix = new THREE.Matrix4();
     const quaternion = new THREE.Quaternion();
@@ -320,13 +461,51 @@ export function Asteroids() {
             new THREE.Vector3(asteroidData.scale, asteroidData.scale, asteroidData.scale)
           );
         } else {
-          // Destroyed → collapse to zero scale
           matrix.makeScale(0, 0, 0);
         }
         instancedMesh.setMatrixAt(asteroidData.instanceIndex, matrix);
         instancedMesh.instanceMatrix.needsUpdate = true;
       }
     });
+
+    // Animate fragments: move outward from center for 2s, then remove
+    const fragmentsGroup = fragmentsGroupRef.current;
+    if (fragmentsGroup) {
+      const toRemove: THREE.Object3D[] = [];
+      fragmentsGroup.traverse((child) => {
+        if (!(child instanceof THREE.Mesh)) return;
+        const spawnedAt = child.userData.spawnedAt as number | undefined;
+        const dir = child.userData.spreadDirection as THREE.Vector3 | undefined;
+        if (typeof spawnedAt !== "number" || !dir) return;
+
+        const elapsed = performance.now() - spawnedAt;
+        const t = Math.min(1, elapsed / FRAGMENT_ANIMATION_DURATION_MS);
+        const opacity = THREE.MathUtils.lerp(1, 0, t);
+
+        if (elapsed < FRAGMENT_ANIMATION_DURATION_MS) {
+          child.position.addScaledVector(dir, FRAGMENT_SPREAD_SPEED * delta);
+          const mats = child.material;
+          if (Array.isArray(mats)) {
+            mats.forEach((m) => {
+              if (m instanceof THREE.MeshStandardMaterial) m.opacity = opacity;
+            });
+          } else if (child.material instanceof THREE.MeshStandardMaterial) {
+            child.material.opacity = opacity;
+          }
+        } else {
+          toRemove.push(child);
+        }
+      });
+      toRemove.forEach((obj) => {
+        fragmentsGroup.remove(obj);
+        if (obj instanceof THREE.Mesh) {
+          obj.geometry?.dispose();
+          const mat = obj.material;
+          if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
+          else if (mat) mat.dispose();
+        }
+      });
+    }
 
     // Periodically recompute bounding spheres so the raycaster broad-phase
     // test stays valid as asteroids drift.
@@ -340,6 +519,8 @@ export function Asteroids() {
 
   return (
     <group>
+      {/* Fracture fragments from dead asteroids */}
+      <group ref={fragmentsGroupRef} />
       {allAsteroidNames.map((asteroidName) => {
         const node = nodes?.[asteroidName as keyof typeof nodes] as THREE.Mesh | undefined;
         if (!node?.geometry || !node?.material) return null;

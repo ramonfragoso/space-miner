@@ -62,11 +62,12 @@ export function useProjectileCollision(
         if (hit.object?.userData?.isAsteroid && hit.instanceId !== undefined) {
           const asteroidName: string = hit.object.userData.asteroidName;
           const asteroidId = `${asteroidName}_${hit.instanceId}`;
-          const damage = gameplay.getDamageMultiplier();
+          const damage = 1;
           const destroyed = gameplay.damageAsteroid(asteroidId, damage);
           hitSoundRef?.current?.playAt(hit.point);
           if (destroyed) {
             explosionSoundRef?.current?.playAt(hit.point);
+            gameplay.onAsteroidDestroyedRef.current?.(asteroidId);
           }
         }
 

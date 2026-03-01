@@ -1,115 +1,75 @@
 "use client";
+
 import { useGameplay } from "../hooks/useGameplay";
-import {
-  ESCAPE_MODULE_COST,
-  type UpgradeState,
-} from "../contexts/GameplayContext";
 
-const UPGRADE_LABELS: Record<keyof UpgradeState, string> = {
-  damage: "Damage",
-  speed: "Speed",
-  shield: "Shield",
-};
-
-const MULTIPLIER_DESC: Record<keyof UpgradeState, Record<1 | 2 | 3, string>> =
-  {
-    damage: { 1: "1x", 2: "2x", 3: "3x" },
-    speed: { 1: "1x", 2: "1.5x", 3: "2x" },
-    shield: { 1: "1x", 2: "2x", 3: "3x" },
-  };
+const panelStyle =
+  "bg-slate-900/50 backdrop-blur-xl border border-cyan-500/30 rounded-xl px-4 py-3 shadow-[0_0_20px_rgba(34,211,238,0.1)]";
+const neonText = "text-cyan-300 drop-shadow-[0_0_6px_rgba(34,211,238,0.6)]";
 
 export function GameplayHUD() {
   const {
-    coins,
-    upgrades,
-    hasEscapeModule,
+    phase,
+    timeLeftSec,
     destroyedCount,
-    purchaseUpgrade,
-    purchaseEscapeModule,
-    canPurchaseUpgrade,
-    canPurchaseEscapeModule,
+    shieldHp,
   } = useGameplay();
 
-  const allMaxed =
-    upgrades.damage === 3 && upgrades.speed === 3 && upgrades.shield === 3;
+  if (phase !== "playing") return null;
+
+  const mins = Math.floor(timeLeftSec / 60);
+  const secs = timeLeftSec % 60;
+  const timeStr = `${mins}:${secs.toString().padStart(2, "0")}`;
 
   return (
-    <div className="fixed top-4 left-4 z-50 pointer-events-auto select-none font-mono text-sm space-y-3">
-      {/* Coins & stats */}
-      <div className="bg-black/70 backdrop-blur-sm rounded-lg px-4 py-3 text-white border border-white/10 shadow-lg">
-        <div className="flex items-center gap-2 text-lg font-bold tracking-wide">
-          <span className="text-yellow-400">&#x2B50;</span>
-          <span>{coins.toLocaleString()} coins</span>
-        </div>
-        <div className="text-white/50 text-xs mt-1">
-          Asteroids destroyed: {destroyedCount}
-        </div>
-      </div>
-
-      {/* Upgrades */}
-      <div className="bg-black/70 backdrop-blur-sm rounded-lg px-4 py-3 text-white border border-white/10 shadow-lg space-y-2">
-        <div className="text-xs uppercase tracking-widest text-white/40 mb-1">
-          Upgrades
-        </div>
-
-        {(Object.keys(UPGRADE_LABELS) as (keyof UpgradeState)[]).map(
-          (type) => {
-            const level = upgrades[type];
-            const { canBuy, cost } = canPurchaseUpgrade(type);
-            const maxed = level >= 3;
-
-            return (
-              <div key={type} className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 min-w-[120px]">
-                  <span className="text-white/80">{UPGRADE_LABELS[type]}</span>
-                  <span className="text-white/40 text-xs">
-                    Lv{level} ({MULTIPLIER_DESC[type][level]})
-                  </span>
-                </div>
-
-                {maxed ? (
-                  <span className="text-green-400 text-xs">MAX</span>
-                ) : (
-                  <button
-                    disabled={!canBuy}
-                    onClick={() => purchaseUpgrade(type)}
-                    className={`px-2 py-0.5 rounded text-xs transition-colors ${
-                      canBuy
-                        ? "bg-yellow-500/80 hover:bg-yellow-400 text-black cursor-pointer"
-                        : "bg-white/10 text-white/30 cursor-not-allowed"
-                    }`}
-                  >
-                    {cost.toLocaleString()} coins
-                  </button>
-                )}
-              </div>
-            );
-          }
-        )}
-      </div>
-
-      {/* Escape module */}
-      {allMaxed && !hasEscapeModule && (
-        <div className="bg-black/70 backdrop-blur-sm rounded-lg px-4 py-3 text-white border border-yellow-500/30 shadow-lg">
-          <button
-            disabled={!canPurchaseEscapeModule()}
-            onClick={() => purchaseEscapeModule()}
-            className={`w-full px-3 py-2 rounded font-bold text-sm tracking-wide transition-colors ${
-              canPurchaseEscapeModule()
-                ? "bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-black cursor-pointer"
-                : "bg-white/10 text-white/30 cursor-not-allowed"
+    <>
+      {/* Countdown - top center */}
+      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+        <div className={`${panelStyle} flex flex-col items-center`}>
+          <span className="text-xs uppercase tracking-widest text-cyan-400/80">
+            Time
+          </span>
+          <span
+            className={`text-3xl font-bold tabular-nums ${neonText} ${
+              timeLeftSec <= 10 ? "animate-pulse" : ""
             }`}
           >
-            Escape Module — {ESCAPE_MODULE_COST.toLocaleString()} coins
-          </button>
+            {timeStr}
+          </span>
         </div>
-      )}
+      </div>
 
-      {hasEscapeModule && (
-        <div className="bg-green-900/70 backdrop-blur-sm rounded-lg px-4 py-3 text-green-300 border border-green-500/30 shadow-lg text-center font-bold">
-          ESCAPE MODULE ACTIVATED — YOU WIN!
+      {/* Asteroid count - bottom left */}
+      <div className="fixed bottom-6 left-6 z-50 pointer-events-none">
+        <div className={`${panelStyle}`}>
+          <span className="text-xs uppercase tracking-widest text-cyan-400/80 block mb-0.5">
+            Destroyed
+          </span>
+          <span className={`text-2xl font-bold ${neonText}`}>
+            {destroyedCount}
+          </span>
         </div>
-      )}
-    </div>
+      </div>
+
+      {/* Shield HP - bottom right */}
+      <div className="fixed bottom-6 right-6 z-50 pointer-events-none">
+        <div className={`${panelStyle}`}>
+          <span className="text-xs uppercase tracking-widest text-cyan-400/80 block mb-0.5">
+            Shield
+          </span>
+          <div className="flex gap-1">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className={`w-3 h-3 rounded-full border transition-colors ${
+                  i <= shieldHp
+                    ? "bg-cyan-400 border-cyan-300 shadow-[0_0_8px_rgba(34,211,238,0.8)]"
+                    : "bg-slate-700/50 border-slate-600"
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </>
   );
 }

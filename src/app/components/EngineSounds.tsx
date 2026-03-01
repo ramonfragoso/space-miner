@@ -24,7 +24,7 @@ const DETUNE_MAX = 1200;
 const SHOT_FILTER = {
   convolver: true,
   loop: false,
-  volume: 12.0,
+  volume: 5.0,
   filter: {
     type: "highpass" as BiquadFilterType,
     frequency: 100,
@@ -48,7 +48,7 @@ const HIT_FILTER = {
 const EXPLOSION_FILTER = {
   // convolver: true,
   loop: false,
-  volume: 10.0,
+  volume: 8.0,
   refDistance: 15,
   filter: {
     type: "highpass" as BiquadFilterType,

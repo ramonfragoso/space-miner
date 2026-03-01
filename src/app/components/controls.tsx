@@ -26,6 +26,16 @@ let turbo = 0;
 
 let controlsBlockedUntil = 0;
 
+/** Reset all velocity/speed state. Call on game retry. */
+export function resetControls(): void {
+  jawVelocity = 0;
+  pitchVelocity = 0;
+  steeringVelocity = 0;
+  shipSpeed = 0;
+  reverseSpeed = 0;
+  turbo = 0;
+}
+
 /** Block ship controls for the given duration (ms). Used e.g. after shield damage. */
 export function blockControlsFor(ms: number): void {
   controlsBlockedUntil = Date.now() + ms;

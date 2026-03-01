@@ -6,7 +6,7 @@ import {
   Matrix4, Vector3, Group, Quaternion, Object3D, Mesh,
   MeshStandardMaterial,
 } from "three";
-import { updateShipAxis, blockControlsFor } from "./controls";
+import { updateShipAxis, blockControlsFor, resetControls } from "./controls";
 import { useDebugUI } from "../hooks/useDebugUI";
 import { useGameplay } from "../hooks/useGameplay";
 import { useShooting } from "../hooks/useShooting";
@@ -50,8 +50,23 @@ export function Spaceship(props: SpaceshipProps) {
   const intersectionRef = useRef(new Vector3());
   const asteroidCenterRef = useRef(new Vector3());
 
+  // Reset ship position and controls when game retries
+  useEffect(() => {
+    if (gameplay.resetKey === 0) return; // Initial load, no reset
+    shipPosition.set(0, 3, 7);
+    x.set(1, 0, 0);
+    y.set(0, 1, 0);
+    z.set(0, 0, 1);
+    delayedQuaternion.identity();
+    pushOffsetRef.current.set(0, 0, 0);
+    pushTargetRef.current.set(0, 0, 0);
+    pushProgressRef.current = 1;
+    resetControls();
+  }, [gameplay.resetKey]);
+
   useEffect(() => {
     gameplay.onShieldDamageRef.current = (data) => {
+      gameplay.applyShieldDamage();
       asteroidCenterRef.current.set(
         data.asteroidCenter[0],
         data.asteroidCenter[1],
@@ -157,7 +172,9 @@ export function Spaceship(props: SpaceshipProps) {
       turbine.rotation.z += delta * 5;
     });
 
-    updateShipAxis(x, y, z, shipPosition, camera, delta);
+    if (gameplay.isGameActive()) {
+      updateShipAxis(x, y, z, shipPosition, camera, delta);
+    }
 
     const pushOffset = pushOffsetRef.current;
     const pushTarget = pushTargetRef.current;
@@ -210,8 +227,10 @@ export function Spaceship(props: SpaceshipProps) {
     camera.matrix.copy(cameraMatrix)
     camera.matrixWorldNeedsUpdate = true
 
-    shooting.trySpawn(effectivePosition, z);
-    updateCollisions(delta, shooting.maxDistance);
+    if (gameplay.isGameActive()) {
+      shooting.trySpawn(effectivePosition, z);
+      updateCollisions(delta, shooting.maxDistance);
+    }
 
     const t = clock.elapsedTime;
     if (shooting.coreMaterialRef.current) {

@@ -2,6 +2,7 @@
 import React, {
   createContext,
   useCallback,
+  useEffect,
   useRef,
   useState,
   type ReactNode,
@@ -14,102 +15,86 @@ import { Vector3, type InstancedMesh } from "three";
 // ---------------------------------------------------------------------------
 export type AsteroidSizeType = "small" | "medium" | "large";
 
+export type GamePhase =
+  | "controls"   // Pre-game: showing controls + Next
+  | "ready"      // Pre-game: showing Start
+  | "playing"    // Active gameplay
+  | "ended";     // Game over: score, retry
+
 export interface AsteroidState {
   id: string;
   type: AsteroidSizeType;
   hp: number;
   maxHp: number;
-  reward: number;
   alive: boolean;
-}
-
-export interface UpgradeState {
-  damage: 1 | 2 | 3;
-  speed: 1 | 2 | 3;
-  shield: 1 | 2 | 3;
 }
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-export const ASTEROID_CONFIG: Record<
-  AsteroidSizeType,
-  { hp: number; reward: number }
-> = {
-  small: { hp: 1, reward: 50 },
-  medium: { hp: 8, reward: 500 },
-  large: { hp: 12, reward: 1200 },
+export const ASTEROID_CONFIG: Record<AsteroidSizeType, { hp: number }> = {
+  small: { hp: 1 },
+  medium: { hp: 8 },
+  large: { hp: 12 },
 };
 
-export const UPGRADE_COSTS: Record<keyof UpgradeState, Record<2 | 3, number>> =
-  {
-    damage: { 2: 3000, 3: 8000 },
-    speed: { 2: 2500, 3: 6000 },
-    shield: { 2: 3500, 3: 7000 },
-  };
-
-export const ESCAPE_MODULE_COST = 15_000;
+export const GAME_DURATION_SEC = 60;
+export const SHIELD_MAX_HP = 3;
+const RECORD_STORAGE_KEY = "space-miner-record";
+const CONTROLS_SEEN_KEY = "space-miner-seen-controls";
 
 // ---------------------------------------------------------------------------
 // Context value interface
 // ---------------------------------------------------------------------------
 export interface GameplayContextValue {
-  /* ---- reactive state (triggers re‑renders) ---- */
-  coins: number;
-  upgrades: UpgradeState;
-  hasEscapeModule: boolean;
+  /* ---- reactive state ---- */
+  phase: GamePhase;
+  timeLeftSec: number;
   destroyedCount: number;
+  shieldHp: number;
+  shipHp: number; // 1 = alive, 0 = dead
+  record: number;
+  wasNewRecord: boolean;
+  resetKey: number;
+
+  /* ---- game flow ---- */
+  goToReady: () => void;
+  startGame: () => void;
+  endGame: (_reason: "time" | "death") => void;
+  retry: () => void;
+  isGameActive: () => boolean;
+  applyShieldDamage: () => void;
 
   /* ---- asteroid management ---- */
   registerAsteroid: (id: string, type: AsteroidSizeType) => void;
-  /** Returns `true` when the asteroid is destroyed by this hit. */
   damageAsteroid: (id: string, damage: number) => boolean;
   isAsteroidAlive: (id: string) => boolean;
   getAsteroid: (id: string) => AsteroidState | undefined;
 
-  /* ---- upgrades ---- */
-  purchaseUpgrade: (type: keyof UpgradeState) => boolean;
-  purchaseEscapeModule: () => boolean;
-  canPurchaseUpgrade: (
-    type: keyof UpgradeState
-  ) => { canBuy: boolean; cost: number };
-  canPurchaseEscapeModule: () => boolean;
-
-  /* ---- multipliers (read from refs – safe in useFrame) ---- */
-  getDamageMultiplier: () => number;
-  getSpeedMultiplier: () => number;
-  getShieldMultiplier: () => number;
-
-  /* ---- shared mesh refs (for direct raycasting) ---- */
+  /* ---- shared refs ---- */
   asteroidMeshesRef: MutableRefObject<InstancedMesh[]>;
   shipPositionRef: MutableRefObject<Vector3>;
-
-  /* ---- shield collision callback (called from Asteroids useFrame) ---- */
   onShieldCollisionRef: MutableRefObject<
     ((data: {
       uv: [number, number];
       direction: [number, number, number];
       asteroidId: string;
-      /** Intersection point on hull in world space (used for ring center). */
       intersectionPoint: [number, number, number];
     }) => void) | null
   >;
-  /** Shield damage (e.g. HP) – called at most once per debounce window from Asteroids. */
   onShieldDamageRef: MutableRefObject<
     ((data: {
       uv: [number, number];
       direction: [number, number, number];
       asteroidId: string;
-      /** Asteroid center in world space (for push direction). */
       asteroidCenter: [number, number, number];
-      /** Intersection point on hull in world space. */
       intersectionPoint: [number, number, number];
     }) => void) | null
   >;
-  /** Optional: play positional sound when shield collides with asteroid (intersection point). */
   onShieldCollisionSoundRef: MutableRefObject<
     ((position: [number, number, number]) => void) | null
   >;
+  onAsteroidDestroyedRef: MutableRefObject<((asteroidId: string) => void) | null>;
 }
 
 // ---------------------------------------------------------------------------
@@ -121,24 +106,10 @@ export const GameplayContext = createContext<GameplayContextValue | null>(null);
 // Provider
 // ---------------------------------------------------------------------------
 export function GameplayProvider({ children }: { children: ReactNode }) {
-  // ----- refs are the *source of truth* (fast reads in the game loop) -----
-  const coinsRef = useRef(0);
-  const upgradesRef = useRef<UpgradeState>({
-    damage: 1,
-    speed: 1,
-    shield: 1,
-  });
-  const hasEscapeModuleRef = useRef(false);
   const asteroidRegistryRef = useRef<Map<string, AsteroidState>>(new Map());
-
-  // Shared ref: Asteroids component pushes its InstancedMesh refs here
-  // so the Spaceship can raycast against them directly.
   const asteroidMeshesRef = useRef<InstancedMesh[]>([]);
-
-  // Shared ref: Spaceship writes its position here each frame for shield-asteroid collision.
   const shipPositionRef = useRef<Vector3>(new Vector3());
 
-  // Callback ref: Shield (or other) registers to receive collision events with UV.
   const onShieldCollisionRef = useRef<
     ((data: {
       uv: [number, number];
@@ -148,7 +119,6 @@ export function GameplayProvider({ children }: { children: ReactNode }) {
     }) => void) | null
   >(null);
 
-  // Callback ref: HP damage from shield hit – Asteroids calls this at most once per 2200ms.
   const onShieldDamageRef = useRef<
     ((data: {
       uv: [number, number];
@@ -159,23 +129,130 @@ export function GameplayProvider({ children }: { children: ReactNode }) {
     }) => void) | null
   >(null);
 
-  // Optional: play positional sound when shield collides with asteroid.
   const onShieldCollisionSoundRef = useRef<
     ((position: [number, number, number]) => void) | null
   >(null);
 
-  // ----- state mirrors for React re‑renders (HUD / UI) -----
-  const [coins, setCoins] = useState(0);
-  const [upgrades, setUpgrades] = useState<UpgradeState>({
-    damage: 1,
-    speed: 1,
-    shield: 1,
-  });
-  const [hasEscapeModule, setHasEscapeModule] = useState(false);
-  const [destroyedCount, setDestroyedCount] = useState(0);
+  const onAsteroidDestroyedRef = useRef<((asteroidId: string) => void) | null>(
+    null
+  );
 
-  // Helper – flush ref → state
-  const syncCoins = useCallback(() => setCoins(coinsRef.current), []);
+  const isGameActiveRef = useRef(false);
+  const destroyedCountRef = useRef(0);
+  const recordRef = useRef(0);
+
+  const [phase, setPhase] = useState<GamePhase>("controls");
+  const [timeLeftSec, setTimeLeftSec] = useState(GAME_DURATION_SEC);
+  const [destroyedCount, setDestroyedCount] = useState(0);
+  const [shieldHp, setShieldHp] = useState(SHIELD_MAX_HP);
+  const [shipHp, setShipHp] = useState(1);
+  const [record, setRecord] = useState(0);
+  const [wasNewRecord, setWasNewRecord] = useState(false);
+  const [resetKey, setResetKey] = useState(0);
+
+  // Load record and controls-seen from localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem(RECORD_STORAGE_KEY);
+        if (stored) {
+          const val = parseInt(stored, 10);
+          if (!isNaN(val)) {
+            setRecord(val);
+            recordRef.current = val;
+          }
+        }
+        if (localStorage.getItem(CONTROLS_SEEN_KEY) === "1") {
+          setPhase("ready");
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+  }, []);
+
+  const isGameActive = useCallback(() => isGameActiveRef.current, []);
+
+  const endGame = useCallback(
+    (reason: "time" | "death") => {
+      void reason; // Used for API clarity; both paths behave the same
+      isGameActiveRef.current = false;
+      setPhase("ended");
+      const count = destroyedCountRef.current;
+      const prevRecord = recordRef.current;
+      if (typeof window !== "undefined" && count > prevRecord) {
+        try {
+          localStorage.setItem(RECORD_STORAGE_KEY, String(count));
+        } catch {
+          /* ignore */
+        }
+        recordRef.current = count;
+        setWasNewRecord(true);
+        setRecord(count);
+      } else {
+        setWasNewRecord(false);
+      }
+    },
+    []
+  );
+
+  const applyShieldDamage = useCallback(() => {
+    if (!isGameActiveRef.current) return;
+    setShieldHp((prev) => {
+      if (prev <= 1) {
+        setShipHp(0);
+        endGame("death");
+        return 0;
+      }
+      return prev - 1;
+    });
+  }, [endGame]);
+
+  const goToReady = useCallback(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(CONTROLS_SEEN_KEY, "1");
+      } catch {
+        /* ignore */
+      }
+    }
+    setPhase("ready");
+  }, []);
+  const startGame = useCallback(() => {
+    setPhase("playing");
+    setTimeLeftSec(GAME_DURATION_SEC);
+    setDestroyedCount(0);
+    destroyedCountRef.current = 0;
+    setShieldHp(SHIELD_MAX_HP);
+    setShipHp(1);
+    isGameActiveRef.current = true;
+  }, []);
+
+  const retry = useCallback(() => {
+    setPhase("controls");
+    setTimeLeftSec(GAME_DURATION_SEC);
+    setDestroyedCount(0);
+    destroyedCountRef.current = 0;
+    setShieldHp(SHIELD_MAX_HP);
+    setShipHp(1);
+    setWasNewRecord(false);
+  }, []);
+
+  // Countdown timer when playing
+  useEffect(() => {
+    if (phase !== "playing") return;
+    const interval = setInterval(() => {
+      setTimeLeftSec((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          endGame("time");
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [phase, endGame]);
 
   // -----------------------------------------------------------------------
   // Asteroid helpers
@@ -189,7 +266,6 @@ export function GameplayProvider({ children }: { children: ReactNode }) {
         type,
         hp: cfg.hp,
         maxHp: cfg.hp,
-        reward: cfg.reward,
         alive: true,
       });
     },
@@ -205,14 +281,16 @@ export function GameplayProvider({ children }: { children: ReactNode }) {
       if (asteroid.hp <= 0) {
         asteroid.hp = 0;
         asteroid.alive = false;
-        coinsRef.current += asteroid.reward;
-        syncCoins();
-        setDestroyedCount((prev) => prev + 1);
-        return true; // destroyed
+        setDestroyedCount((prev) => {
+          const next = prev + 1;
+          destroyedCountRef.current = next;
+          return next;
+        });
+        return true;
       }
-      return false; // still alive
+      return false;
     },
-    [syncCoins]
+    []
   );
 
   const isAsteroidAlive = useCallback((id: string): boolean => {
@@ -226,103 +304,36 @@ export function GameplayProvider({ children }: { children: ReactNode }) {
   );
 
   // -----------------------------------------------------------------------
-  // Multipliers (safe to call inside useFrame – read from refs)
-  // -----------------------------------------------------------------------
-  const getDamageMultiplier = useCallback(
-    (): number => upgradesRef.current.damage,
-    []
-  );
-
-  const getSpeedMultiplier = useCallback((): number => {
-    const lvl = upgradesRef.current.speed;
-    return lvl === 1 ? 1 : lvl === 2 ? 1.5 : 2;
-  }, []);
-
-  const getShieldMultiplier = useCallback(
-    (): number => upgradesRef.current.shield,
-    []
-  );
-
-  // -----------------------------------------------------------------------
-  // Purchase helpers
-  // -----------------------------------------------------------------------
-  const canPurchaseUpgrade = useCallback(
-    (type: keyof UpgradeState): { canBuy: boolean; cost: number } => {
-      const currentLevel = upgradesRef.current[type];
-      if (currentLevel >= 3) return { canBuy: false, cost: 0 };
-      const nextLevel = (currentLevel + 1) as 2 | 3;
-      const cost = UPGRADE_COSTS[type][nextLevel];
-      return { canBuy: coinsRef.current >= cost, cost };
-    },
-    []
-  );
-
-  const purchaseUpgrade = useCallback(
-    (type: keyof UpgradeState): boolean => {
-      const currentLevel = upgradesRef.current[type];
-      if (currentLevel >= 3) return false;
-      const nextLevel = (currentLevel + 1) as 2 | 3;
-      const cost = UPGRADE_COSTS[type][nextLevel];
-      if (coinsRef.current < cost) return false;
-
-      coinsRef.current -= cost;
-      upgradesRef.current = { ...upgradesRef.current, [type]: nextLevel };
-
-      setCoins(coinsRef.current);
-      setUpgrades({ ...upgradesRef.current });
-      return true;
-    },
-    []
-  );
-
-  const canPurchaseEscapeModule = useCallback((): boolean => {
-    if (hasEscapeModuleRef.current) return false;
-    const u = upgradesRef.current;
-    return (
-      u.damage === 3 &&
-      u.speed === 3 &&
-      u.shield === 3 &&
-      coinsRef.current >= ESCAPE_MODULE_COST
-    );
-  }, []);
-
-  const purchaseEscapeModule = useCallback((): boolean => {
-    if (!canPurchaseEscapeModule()) return false;
-    coinsRef.current -= ESCAPE_MODULE_COST;
-    hasEscapeModuleRef.current = true;
-    setCoins(coinsRef.current);
-    setHasEscapeModule(true);
-    return true;
-  }, [canPurchaseEscapeModule]);
-
-  // -----------------------------------------------------------------------
   // Context value
   // -----------------------------------------------------------------------
   const value: GameplayContextValue = {
-    coins,
-    upgrades,
-    hasEscapeModule,
+    phase,
+    timeLeftSec,
     destroyedCount,
+    shieldHp,
+    shipHp,
+    record,
+    wasNewRecord,
+    resetKey,
+
+    goToReady,
+    startGame,
+    endGame,
+    retry,
+    isGameActive,
+    applyShieldDamage,
 
     registerAsteroid,
     damageAsteroid,
     isAsteroidAlive,
     getAsteroid,
 
-    purchaseUpgrade,
-    purchaseEscapeModule,
-    canPurchaseUpgrade,
-    canPurchaseEscapeModule,
-
-    getDamageMultiplier,
-    getSpeedMultiplier,
-    getShieldMultiplier,
-
     asteroidMeshesRef,
     shipPositionRef,
     onShieldCollisionRef,
     onShieldDamageRef,
     onShieldCollisionSoundRef,
+    onAsteroidDestroyedRef,
   };
 
   return (
