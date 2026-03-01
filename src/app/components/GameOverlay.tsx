@@ -33,10 +33,10 @@ export function GameOverlay() {
       {/* Controls screen */}
       {phase === "controls" && (
         <div
-          className={`relative ${glassStyle} p-8 max-w-md mx-4`}
+          className={`relative ${glassStyle} p-8 max-w-5xl mx-4`}
         >
           <h2
-            className={`text-2xl font-bold mb-6 ${neonText} text-center uppercase tracking-widest`}
+            className={`text-2xl font-bold mb-6 ${neonText} text-center uppercase tracking-widest mr-32`}
           >
             Controls
           </h2>
@@ -70,7 +70,7 @@ export function GameOverlay() {
             Ready to Mine
           </h2>
           <p className="text-slate-300 text-center mb-8 text-sm">
-            Destroy as many asteroids as you can in 60 seconds.
+            Destroy as many asteroids as you can in 2 minutes.
             <br />
             Shield absorbs 3 hits — survive the chaos!
           </p>

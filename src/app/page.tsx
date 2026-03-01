@@ -10,6 +10,7 @@ import { Planet } from "./components/Planet";
 import { GameplayProvider } from "./contexts/GameplayContext";
 import { GameplayHUD } from "./components/GameplayHUD";
 import { GameOverlay } from "./components/GameOverlay";
+import { ControlsHelpOverlay } from "./components/ControlsHelpOverlay";
 import WebGPUCanvas from "./components/WebGPUCanvas";
 import { PostProcessing } from "./components/PostProcessing";
 
@@ -27,12 +28,13 @@ export default function Home() {
   return (
     <GameplayProvider>
     <div className="w-full h-screen">
-      <div className="z-50 absolute overflow-auto top-1 right-1 rounded-md max-w-[370px] max-h-screen ">
-        <Leva fill collapsed/>
+      <div className="hidden">
+        <Leva fill collapsed />
       </div>
 
       <GameplayHUD />
       <GameOverlay />
+      <ControlsHelpOverlay />
 
       <WebGPUCanvas>
         <Environment

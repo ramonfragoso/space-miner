@@ -38,7 +38,7 @@ export const ASTEROID_CONFIG: Record<AsteroidSizeType, { hp: number }> = {
   large: { hp: 12 },
 };
 
-export const GAME_DURATION_SEC = 60;
+export const GAME_DURATION_SEC = 120;
 export const SHIELD_MAX_HP = 3;
 const RECORD_STORAGE_KEY = "space-miner-record";
 const CONTROLS_SEEN_KEY = "space-miner-seen-controls";
@@ -150,7 +150,7 @@ export function GameplayProvider({ children }: { children: ReactNode }) {
   const [wasNewRecord, setWasNewRecord] = useState(false);
   const [resetKey, setResetKey] = useState(0);
 
-  // Load record and controls-seen from localStorage
+  // Load record from localStorage (do NOT auto-advance phase; controls only close on Next click)
   useEffect(() => {
     if (typeof window !== "undefined") {
       try {
@@ -161,9 +161,6 @@ export function GameplayProvider({ children }: { children: ReactNode }) {
             setRecord(val);
             recordRef.current = val;
           }
-        }
-        if (localStorage.getItem(CONTROLS_SEEN_KEY) === "1") {
-          setPhase("ready");
         }
       } catch {
         /* ignore */
