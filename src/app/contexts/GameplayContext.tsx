@@ -229,7 +229,12 @@ export function GameplayProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const retry = useCallback(() => {
-    setPhase("controls");
+    asteroidRegistryRef.current.clear();
+    setResetKey((k) => k + 1);
+    const seenControls =
+      typeof window !== "undefined" &&
+      localStorage.getItem(CONTROLS_SEEN_KEY) === "1";
+    setPhase(seenControls ? "ready" : "controls");
     setTimeLeftSec(GAME_DURATION_SEC);
     setDestroyedCount(0);
     destroyedCountRef.current = 0;

@@ -141,6 +141,7 @@ export function Asteroids() {
   }, [nodes, allAsteroidNames]);
 
   const { asteroidsData, instanceCounts } = useMemo(() => {
+    void resetKey; // Force regeneration when game retries
     const instanceIndices = new Map<number, number>();
     allAsteroidNames.forEach((_, idx) => instanceIndices.set(idx, 0));
 
