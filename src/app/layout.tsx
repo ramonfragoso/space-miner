@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Three.js Simple App",
-  description: "A simple Three.js application with a cube and orbit controls",
+  title: "Space Miner",
+  description: "Destroy the asteroids!",
 };
 
 export default function RootLayout({
