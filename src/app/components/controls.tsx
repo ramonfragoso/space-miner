@@ -1,19 +1,44 @@
 import { Vector3 } from "three";
 import type { PerspectiveCamera, OrthographicCamera } from "three";
 
-const controls: Record<string, boolean> = {};
+/** Physical key states by event.code (layout-independent, works with AZERTY etc.) */
+const keysPressed: Record<string, boolean> = {};
+
+/** Logical control groups: each maps to physical key codes (WASD + Arrow keys) */
+const CODE_GROUPS: Record<string, string[]> = {
+  left: ["KeyA", "ArrowLeft"],
+  right: ["KeyD", "ArrowRight"],
+  forward: ["KeyW", "ArrowUp"],
+  backward: ["KeyS", "ArrowDown"],
+  steerLeft: ["KeyQ"],
+  steerRight: ["KeyE"],
+  thrust: ["Space"],
+  turbo: ["ShiftLeft", "ShiftRight"],
+  reverse: ["ControlLeft", "ControlRight"],
+  shoot: ["KeyP"],
+};
+
+function isPressed(logical: string): boolean {
+  return CODE_GROUPS[logical]?.some((code) => keysPressed[code]) ?? false;
+}
 
 function easeOutQuad(x: number) {
-  return 1 - (1 - x) * (1 - x)
+  return 1 - (1 - x) * (1 - x);
 }
 
 if (typeof window !== "undefined") {
+  const trackedCodes = new Set(Object.values(CODE_GROUPS).flat());
   window.addEventListener("keydown", (e) => {
-    controls[e.key.toLowerCase()] = true;
+    if (trackedCodes.has(e.code)) {
+      e.preventDefault();
+      keysPressed[e.code] = true;
+    }
   });
 
   window.addEventListener("keyup", (e) => {
-    controls[e.key.toLowerCase()] = false;
+    if (trackedCodes.has(e.code)) {
+      keysPressed[e.code] = false;
+    }
   });
 }
 
@@ -43,7 +68,7 @@ export function blockControlsFor(ms: number): void {
 
 /** True when space (thrust) or shift (turbo) is pressed. */
 export function isThrustPressed(): boolean {
-  return !!(controls[" "] || controls["shift"]);
+  return isPressed("thrust") || isPressed("turbo");
 }
 
 /** Returns the ship's current effective speed (units/sec). */
@@ -67,7 +92,7 @@ let shootTriggered = false;
 const SHOOT_COOLDOWN = 70;
 
 export function shoot(): boolean {
-  if (!controls["p"]) {
+  if (!isPressed("shoot")) {
     shootTriggered = false;
     return false;
   }
@@ -95,38 +120,38 @@ export function updateShipAxis(
   pitchVelocity *= Math.pow(0.93, deltaTime);
   steeringVelocity *= Math.pow(0.93, deltaTime);
  
-  if(controls[' ']) {
+  if (isPressed("thrust")) {
     shipSpeed += 0.0005 * deltaTime
   } else {
     shipSpeed *= Math.pow(0.95, deltaTime)
   }
   shipSpeed = Math.max(shipSpeed, 0)
 
-  if (controls["a"]) {
+  if (isPressed("left")) {
     jawVelocity = 0.015;
   }
 
-  if (controls["d"]) {
+  if (isPressed("right")) {
     jawVelocity = -0.015;
   }
 
-  if (controls["s"]) {
+  if (isPressed("backward")) {
     pitchVelocity = 0.015;
   }
 
-  if (controls["w"]) {
+  if (isPressed("forward")) {
     pitchVelocity = -0.015;
   }
 
-  if (controls["q"]) {
+  if (isPressed("steerLeft")) {
     steeringVelocity = 0.01;
   }
 
-  if (controls["e"]) {
+  if (isPressed("steerRight")) {
     steeringVelocity = -0.01;
   }
 
-  if (controls["control"]) {
+  if (isPressed("reverse")) {
     reverseSpeed += 0.0005 * deltaTime;
   } else {
     reverseSpeed *= Math.pow(0.95, deltaTime);
@@ -146,7 +171,7 @@ export function updateShipAxis(
   y.normalize()
   z.normalize()
 
-  if (controls.shift) {
+  if (isPressed("turbo")) {
     turbo += 0.02 * deltaTime
   } else {
     turbo *= Math.pow(0.95, deltaTime)

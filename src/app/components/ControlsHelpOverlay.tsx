@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 import { useGameplay } from "../hooks/useGameplay";
-import { CONTROLS_DISPLAY } from "../config/controlsDisplay";
+import {
+  CONTROLS_DISPLAY,
+  KEYBOARD_LAYOUT_DISCLAIMER,
+} from "../config/controlsDisplay";
 
 const glassStyle =
   "bg-slate-900/40 backdrop-blur-xl border border-cyan-500/30 rounded-2xl shadow-[0_0_30px_rgba(34,211,238,0.15)]";
@@ -51,10 +54,10 @@ export function ControlsHelpOverlay() {
                 X
               </button>
             </div>
-            <div className="space-y-2 mb-6">
+            <div className="space-y-2 mb-4">
               {CONTROLS_DISPLAY.map(({ key, description }) => (
                 <div
-                  key={key}
+                  key={description}
                   className="flex justify-between items-center py-2 px-4 rounded-lg bg-cyan-500/10 border border-cyan-500/20"
                 >
                   <kbd className="px-2 py-1 rounded bg-cyan-950/60 border border-cyan-500/40 text-cyan-200 font-mono text-sm">
@@ -64,6 +67,9 @@ export function ControlsHelpOverlay() {
                 </div>
               ))}
             </div>
+            <p className="text-slate-400 text-xs italic mb-6 text-center">
+              {KEYBOARD_LAYOUT_DISCLAIMER}
+            </p>
             <button
               onClick={() => setOpen(false)}
               className={`w-full ${btnPrimary}`}
